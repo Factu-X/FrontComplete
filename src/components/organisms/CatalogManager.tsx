@@ -21,7 +21,7 @@ const formTypeOptions = [
   { value: 'part', label: 'Repuesto' },
 ];
 
-const emptyForm = { code: '', name: '', description: '', type: 'service' as const, price: 0 };
+const emptyForm = { code: '', name: '', description: '', type: 'service' as 'service' | 'part', price: 0 };
 
 interface Props {
   catalog: CatalogItem[];

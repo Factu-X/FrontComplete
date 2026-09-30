@@ -343,17 +343,19 @@ export default function RemindersManager({ reminders, setReminders, customers, a
 
 // ─── Sub-form component ────────────────────────────────────────────────────
 
+interface ReminderFormState {
+  motorcycleId: number | '';
+  maintenanceType: string;
+  customMaintenanceType: string;
+  triggerType: ReminderTrigger;
+  scheduledDate: string;
+  scheduledKm: number | '';
+  observations: string;
+}
+
 interface ReminderFormProps {
-  form: ReturnType<typeof Object.assign> & {
-    motorcycleId: number | '';
-    maintenanceType: string;
-    customMaintenanceType: string;
-    triggerType: ReminderTrigger;
-    scheduledDate: string;
-    scheduledKm: number | '';
-    observations: string;
-  };
-  setForm: React.Dispatch<React.SetStateAction<typeof form>>;
+  form: ReminderFormState;
+  setForm: React.Dispatch<React.SetStateAction<ReminderFormState>>;
   errors: Record<string, string>;
   motoOptions: { value: string; label: string }[];
   fixedMoto?: boolean;

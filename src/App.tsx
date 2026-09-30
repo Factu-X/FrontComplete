@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import LoginPage from './components/pages/LoginPage';
 import DashboardPage from './components/pages/DashboardPage';
 import HelpPage from './components/pages/HelpPage';
@@ -15,6 +15,9 @@ import UserManager from './components/organisms/UserManager';
 import UsabilityTest from './components/organisms/UsabilityTest';
 import Sidebar, { Page } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
+import { apiRequest } from './lib/api';
+import { supabase } from './lib/supabase';
+import type { AuthUser, BackendProfile, UserRole } from './lib/types';
 import { Customer, CatalogItem, Order, Reminder, CompanyConfig, Invoice, CreditNote, UsabilitySession } from './types';
 import {
   initialCustomers, initialCatalog, initialOrders,
@@ -22,10 +25,14 @@ import {
   initialCreditNotes, initialUsabilitySessions,
 } from './data/initialData';
 
-type AuthState = { email: string; role: 'admin' | 'operator' } | null;
+type AuthState = { user: AuthUser; token: string } | null;
+
+const roleFromProfile = (rol: BackendProfile['rol']): UserRole =>
+  rol === 'ADMINISTRADOR' ? 'admin' : 'operator';
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [page, setPage] = useState<Page>('dashboard');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -48,15 +55,64 @@ export default function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  function handleLogin(email: string, role: 'admin' | 'operator') {
-    setAuth({ email, role });
+  // Restaura la sesión de Supabase al cargar y mantiene el token actualizado
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile(token: string, email: string) {
+      const profile = await apiRequest<{ data: BackendProfile }>('/auth/me', { token });
+      if (!active) return;
+      setAuth({
+        token,
+        user: { id: profile.data.id, email, role: roleFromProfile(profile.data.rol) },
+      });
+    }
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const email = data.session?.user.email;
+        if (token && email) await loadProfile(token, email);
+      } catch {
+        await supabase.auth.signOut();
+      } finally {
+        if (active) setCheckingSession(false);
+      }
+    })();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setAuth(null);
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        setAuth(prev => (prev ? { ...prev, token: session.access_token } : prev));
+      }
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  function handleLogin(user: AuthUser, token: string) {
+    setAuth({ user, token });
     setPage('dashboard');
-    addToast({ message: `Bienvenido a FactuX — ${role === 'admin' ? 'Administrador' : 'Operador'}`, type: 'success' });
+    addToast({ message: `Bienvenido a FactuX — ${user.role === 'admin' ? 'Administrador' : 'Operador'}`, type: 'success' });
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await supabase.auth.signOut();
     setAuth(null);
     setPage('dashboard');
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center text-[#8b949e] text-sm">
+        Validando sesión...
+      </div>
+    );
   }
 
   if (!auth) {
@@ -68,7 +124,7 @@ export default function App() {
     );
   }
 
-  const userName = auth.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const userName = auth.user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
   const openOrderCount = orders.filter(o => o.status === 'open' || o.status === 'in_process').length;
   const pendingReminderCount = reminders.filter(r => r.status === 'pending').length;
   const pendingReceivables = invoices.filter(i => i.status !== 'cancelled' && i.paymentStatus !== 'paid').length;
@@ -78,7 +134,7 @@ export default function App() {
     companyConfig.dianClientId && companyConfig.dianClientSecret
   );
 
-  const isAdmin = auth.role === 'admin';
+  const isAdmin = auth.user.role === 'admin';
   const adminPages: Page[] = ['settings', 'users', 'usability'];
   const isRestrictedPage = adminPages.includes(page);
 
@@ -87,7 +143,7 @@ export default function App() {
       <Sidebar
         current={page}
         onNavigate={setPage}
-        userRole={auth.role}
+        userRole={auth.user.role}
         userName={userName}
         onLogout={handleLogout}
         orderCount={openOrderCount}
@@ -100,7 +156,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-6 py-7">
           {page === 'dashboard' && (
             <DashboardPage
-              userRole={auth.role}
+              userRole={auth.user.role}
               userName={userName}
               onNavigate={p => setPage(p as Page)}
               orders={orders}

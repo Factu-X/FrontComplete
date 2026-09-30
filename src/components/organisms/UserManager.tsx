@@ -30,7 +30,7 @@ const roleOptions = [
   { value: 'operator', label: 'Operador' },
 ];
 
-const emptyForm = { name: '', email: '', role: 'operator' as const, password: '', confirmPassword: '' };
+const emptyForm = { name: '', email: '', role: 'operator' as 'admin' | 'operator', password: '', confirmPassword: '' };
 
 interface Props { addToast: (t: Omit<ToastItem, 'id'>) => void; }
 
