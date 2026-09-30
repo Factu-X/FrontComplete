@@ -1,0 +1,10 @@
+{
+  "description": "Manage workshop services and customer data seamlessly with a user-friendly interface, ensuring efficient operations for motorcycle repair shops in Colombia.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
