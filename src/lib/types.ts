@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'operator';
+export type UserRole = 'admin' | 'billing' | 'operator';
 
 export type AuthUser = {
   id: string;
@@ -6,11 +6,18 @@ export type AuthUser = {
   role: UserRole;
 };
 
+export type BackendRol = 'ADMINISTRADOR' | 'FACTURACION' | 'OPERADOR';
+
 export type BackendProfile = {
   id: string;
   nombre: string;
-  rol: 'ADMINISTRADOR' | 'OPERADOR';
+  rol: BackendRol;
   activo: boolean;
+};
+
+export type BackendUsuario = BackendProfile & {
+  email: string | null;
+  createdAt: string;
 };
 
 export type BackendCliente = {
@@ -37,6 +44,8 @@ export type BackendMotocicleta = {
   activa: boolean;
 };
 
+export type TratamientoIva = 'GRAVADO' | 'EXENTO' | 'EXCLUIDO';
+
 export type BackendCatalogItem = {
   id: string;
   codigo: string;
@@ -44,19 +53,44 @@ export type BackendCatalogItem = {
   descripcion: string | null;
   tipo: 'SERVICIO' | 'REPUESTO';
   precioVenta: string;
-  tratamientoIva: 'GRAVADO' | 'EXENTO' | 'EXCLUIDO';
+  tratamientoIva: TratamientoIva;
   tarifaIva: string;
   activo: boolean;
 };
+
+export type EstadoOrden = 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA';
 
 export type BackendOrden = {
   id: string;
   numero: string;
   clienteId: string;
   motocicletaId: string;
-  estado: 'ABIERTA' | 'EN_PROCESO' | 'FINALIZADA' | 'CANCELADA';
+  fechaIngreso: string;
+  kilometrajeIngreso: number;
+  motivoIngreso: string;
+  observaciones: string | null;
+  estado: EstadoOrden;
   subtotal: string;
   impuestos: string;
+  total: string;
+  finalizadaAt: string | null;
+  cliente?: BackendCliente;
+  motocicleta?: BackendMotocicleta;
+};
+
+export type BackendDetalleOrden = {
+  id: string;
+  ordenId: string;
+  itemCatalogoId: string;
+  codigoItem: string;
+  nombreItem: string;
+  tipoItem: 'SERVICIO' | 'REPUESTO';
+  cantidad: string;
+  precioUnitario: string;
+  tratamientoIva: TratamientoIva;
+  tarifaIva: string;
+  subtotal: string;
+  impuesto: string;
   total: string;
 };
 

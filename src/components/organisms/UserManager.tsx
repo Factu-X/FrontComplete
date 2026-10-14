@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -8,34 +8,55 @@ import DataTable from '../molecules/DataTable';
 import SearchBar from '../molecules/SearchBar';
 import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
+import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
+import { BACKEND_ROLE, ROLE_LABELS, roleFromProfile } from '../../lib/roles';
+import type { BackendUsuario, UserRole } from '../../lib/types';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
-  role: 'admin' | 'operator';
+  role: UserRole;
   active: boolean;
   createdAt: string;
 }
 
-const initialUsers: User[] = [
-  { id: 1, name: 'Carlos Administrador', email: 'admin@factux.co', role: 'admin', active: true, createdAt: '2025-01-10' },
-  { id: 2, name: 'Pedro Mecánico', email: 'pedro.mecanico@factux.co', role: 'operator', active: true, createdAt: '2025-02-15' },
-  { id: 3, name: 'Ana Recepción', email: 'ana.recepcion@factux.co', role: 'operator', active: true, createdAt: '2025-03-22' },
-  { id: 4, name: 'Luis Antiguo', email: 'luis.antiguo@factux.co', role: 'operator', active: false, createdAt: '2024-08-01' },
-];
+const roleOptions = (Object.keys(ROLE_LABELS) as UserRole[]).map(value => ({ value, label: ROLE_LABELS[value] }));
 
-const roleOptions = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'operator', label: 'Operador' },
-];
+const ROLE_BADGE: Record<UserRole, 'admin' | 'billing' | 'operator'> = {
+  admin: 'admin',
+  billing: 'billing',
+  operator: 'operator',
+};
 
-const emptyForm = { name: '', email: '', role: 'operator' as 'admin' | 'operator', password: '', confirmPassword: '' };
+type UserForm = {
+  name: string;
+  email: string;
+  role: UserRole;
+  password: string;
+  confirmPassword: string;
+};
 
-interface Props { addToast: (t: Omit<ToastItem, 'id'>) => void; }
+const emptyForm: UserForm = { name: '', email: '', role: 'operator', password: '', confirmPassword: '' };
 
-export default function UserManager({ addToast }: Props) {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+const mapUser = (usuario: BackendUsuario): User => ({
+  id: usuario.id,
+  name: usuario.nombre,
+  email: usuario.email ?? '',
+  role: roleFromProfile(usuario.rol),
+  active: usuario.activo,
+  createdAt: usuario.createdAt.slice(0, 10),
+});
+
+interface Props {
+  addToast: (t: Omit<ToastItem, 'id'>) => void;
+  session: ApiSession;
+  currentUserId: string;
+}
+
+export default function UserManager({ addToast, session, currentUserId }: Props) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -43,6 +64,22 @@ export default function UserManager({ addToast }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState<User | null>(null);
+
+  async function loadUsers() {
+    setLoading(true);
+    try {
+      const response = await apiRequest<ApiListResponse<BackendUsuario>>('/usuarios', session);
+      setUsers(response.data.map(mapUser));
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudieron cargar los usuarios', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadUsers();
+  }, [session.token]);
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
@@ -65,11 +102,11 @@ export default function UserManager({ addToast }: Props) {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = 'El nombre es obligatorio';
+    if (form.name.trim().length < 2) e.name = 'El nombre es obligatorio';
     if (!form.email.trim()) e.email = 'El correo es obligatorio';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido';
+    else if (users.find(u => u.email === form.email.trim() && u.id !== editingUser?.id)) e.email = 'Este correo ya está registrado';
     if (!editingUser) {
-      if (users.find(u => u.email === form.email.trim())) e.email = 'Este correo ya está registrado';
       if (!form.password) e.password = 'La contraseña es obligatoria';
       else if (form.password.length < 8) e.password = 'Mínimo 8 caracteres';
       if (form.password !== form.confirmPassword) e.confirmPassword = 'Las contraseñas no coinciden';
@@ -77,35 +114,58 @@ export default function UserManager({ addToast }: Props) {
     return e;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
-    setTimeout(() => {
+    try {
       if (editingUser) {
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, name: form.name, email: form.email, role: form.role } : u));
+        await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${editingUser.id}`, session, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            nombre: form.name.trim(),
+            rol: BACKEND_ROLE[form.role],
+            ...(form.email.trim() !== editingUser.email ? { email: form.email.trim() } : {}),
+          }),
+        });
         addToast({ message: 'Usuario actualizado correctamente', type: 'success' });
       } else {
-        const newUser: User = {
-          id: Date.now(), name: form.name, email: form.email,
-          role: form.role, active: true, createdAt: new Date().toISOString().slice(0, 10),
-        };
-        setUsers(prev => [...prev, newUser]);
-        addToast({ message: 'Usuario creado. Contraseña almacenada de forma segura.', type: 'success' });
+        await apiRequest<ApiEntityResponse<BackendUsuario>>('/usuarios', session, {
+          method: 'POST',
+          body: JSON.stringify({
+            nombre: form.name.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            rol: BACKEND_ROLE[form.role],
+          }),
+        });
+        addToast({ message: 'Usuario creado. Ya puede iniciar sesión.', type: 'success' });
       }
-      setSaving(false);
       setModalOpen(false);
-    }, 500);
+      await loadUsers();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el usuario', type: 'error' });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleToggle() {
+  async function handleToggle() {
     if (!confirmToggle) return;
-    setUsers(prev => prev.map(u => u.id === confirmToggle.id ? { ...u, active: !u.active } : u));
-    addToast({
-      message: confirmToggle.active ? `Cuenta de ${confirmToggle.name} desactivada` : `Cuenta de ${confirmToggle.name} activada`,
-      type: confirmToggle.active ? 'warning' : 'success',
-    });
-    setConfirmToggle(null);
+    try {
+      await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${confirmToggle.id}`, session, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo: !confirmToggle.active }),
+      });
+      addToast({
+        message: confirmToggle.active ? `Cuenta de ${confirmToggle.name} desactivada` : `Cuenta de ${confirmToggle.name} activada`,
+        type: confirmToggle.active ? 'warning' : 'success',
+      });
+      setConfirmToggle(null);
+      await loadUsers();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo cambiar el estado', type: 'error' });
+    }
   }
 
   const columns = [
@@ -115,15 +175,13 @@ export default function UserManager({ addToast }: Props) {
           {u.name.charAt(0)}
         </div>
         <div>
-          <div className="font-medium text-[#e6edf3]">{u.name}</div>
-          <div className="text-xs text-[#6e7681]">{u.email}</div>
+          <div className="font-medium text-[#e6edf3]">{u.name}{u.id === currentUserId && <span className="text-xs text-[#6e7681]"> (tú)</span>}</div>
+          <div className="text-xs text-[#6e7681]">{u.email || '—'}</div>
         </div>
       </div>
     )},
     { key: 'role', header: 'Rol', render: (u: User) => (
-      <Badge variant={u.role === 'admin' ? 'admin' : 'operator'}>
-        {u.role === 'admin' ? 'Administrador' : 'Operador'}
-      </Badge>
+      <Badge variant={ROLE_BADGE[u.role]}>{ROLE_LABELS[u.role]}</Badge>
     )},
     { key: 'active', header: 'Estado', render: (u: User) => (
       <Badge variant={u.active ? 'active' : 'inactive'}>{u.active ? 'Activo' : 'Inactivo'}</Badge>
@@ -134,9 +192,11 @@ export default function UserManager({ addToast }: Props) {
     { key: 'actions', header: '', render: (u: User) => (
       <div className="flex gap-1.5 justify-end">
         <Button size="sm" variant="ghost" onClick={() => openEdit(u)}>Editar</Button>
-        <Button size="sm" variant={u.active ? 'ghost' : 'outline'} onClick={() => setConfirmToggle(u)}>
-          {u.active ? 'Desactivar' : 'Activar'}
-        </Button>
+        {u.id !== currentUserId && (
+          <Button size="sm" variant={u.active ? 'ghost' : 'outline'} onClick={() => setConfirmToggle(u)}>
+            {u.active ? 'Desactivar' : 'Activar'}
+          </Button>
+        )}
       </div>
     )},
   ];
@@ -155,7 +215,7 @@ export default function UserManager({ addToast }: Props) {
         {[
           { label: 'Total usuarios', value: users.length, color: 'text-[#e6edf3]' },
           { label: 'Administradores', value: users.filter(u => u.role === 'admin' && u.active).length, color: 'text-[#f97316]' },
-          { label: 'Operadores activos', value: users.filter(u => u.role === 'operator' && u.active).length, color: 'text-sky-400' },
+          { label: 'Facturación / Operarios', value: users.filter(u => u.role !== 'admin' && u.active).length, color: 'text-sky-400' },
           { label: 'Desactivados', value: users.filter(u => !u.active).length, color: 'text-[#6e7681]' },
         ].map(stat => (
           <div key={stat.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3">
@@ -170,11 +230,11 @@ export default function UserManager({ addToast }: Props) {
       <div className="bg-[#1c2128]/60 border border-[#f97316]/20 rounded-[6px] px-4 py-3 flex items-start gap-3 text-sm">
         <span className="text-[#f97316] mt-0.5">⚠</span>
         <div className="text-[#8b949e]">
-          Las contraseñas se almacenan con hash seguro (bcrypt). Los usuarios desactivados no pueden iniciar sesión pero su información histórica se conserva.
+          Las cuentas se gestionan en Supabase Auth. Los usuarios desactivados no pueden usar el sistema, pero su información histórica se conserva.
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage="No se encontraron usuarios" />
+      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando usuarios...' : 'No se encontraron usuarios'} />
 
       <Modal
         title={editingUser ? 'Editar usuario' : 'Registrar usuario'}
@@ -203,7 +263,8 @@ export default function UserManager({ addToast }: Props) {
             label="Rol *"
             options={roleOptions}
             value={form.role}
-            onChange={e => setForm(f => ({ ...f, role: e.target.value as 'admin' | 'operator' }))}
+            onChange={e => setForm(f => ({ ...f, role: e.target.value as UserRole }))}
+            disabled={editingUser?.id === currentUserId}
           />
           {!editingUser && (
             <>
@@ -232,8 +293,8 @@ export default function UserManager({ addToast }: Props) {
         open={!!confirmToggle}
         title={confirmToggle?.active ? 'Desactivar usuario' : 'Activar usuario'}
         message={confirmToggle?.active
-          ? `¿Desactivar la cuenta de "${confirmToggle?.name}"? No podrá iniciar sesión, pero su historial se conserva.`
-          : `¿Activar la cuenta de "${confirmToggle?.name}"? Podrá iniciar sesión nuevamente.`
+          ? `¿Desactivar la cuenta de "${confirmToggle?.name}"? No podrá usar el sistema, pero su historial se conserva.`
+          : `¿Activar la cuenta de "${confirmToggle?.name}"? Podrá usar el sistema nuevamente.`
         }
         confirmLabel={confirmToggle?.active ? 'Desactivar' : 'Activar'}
         destructive={confirmToggle?.active}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import SearchBar from '../molecules/SearchBar';
@@ -6,121 +6,95 @@ import Modal from '../molecules/Modal';
 import DataTable from '../molecules/DataTable';
 import OrderForm from './OrderForm';
 import OrderDetail from './OrderDetail';
-import { Customer, CatalogItem, Order, OrderStatus } from '../../types';
 import { ToastItem } from '../molecules/ToastContainer';
+import { apiRequest, ApiListResponse, ApiSession } from '../../lib/api';
+import { formatCOP, isOrderEditable, matchesOrderSearch, STATUS_BADGE, STATUS_LABELS } from '../../lib/orders';
+import { canCreateOrders } from '../../lib/roles';
+import type { BackendOrden, EstadoOrden, UserRole } from '../../lib/types';
 
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  open: 'Abierta',
-  in_process: 'En proceso',
-  finished: 'Finalizada',
-  cancelled: 'Cancelada',
-};
-
-const STATUS_BADGE: Record<OrderStatus, 'active' | 'warning' | 'service' | 'inactive'> = {
-  open: 'active',
-  in_process: 'warning',
-  finished: 'service',
-  cancelled: 'inactive',
-};
-
-const statusFilterOptions = [
+const statusFilterOptions: [EstadoOrden | 'all', string][] = [
   ['all', 'Todos'],
-  ['open', 'Abiertas'],
-  ['in_process', 'En proceso'],
-  ['finished', 'Finalizadas'],
-  ['cancelled', 'Canceladas'],
+  ['ABIERTA', 'Abiertas'],
+  ['EN_PROCESO', 'En proceso'],
+  ['FINALIZADA', 'Finalizadas'],
+  ['CANCELADA', 'Canceladas'],
 ];
 
 interface Props {
-  orders: Order[];
-  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
-  customers: Customer[];
-  catalog: CatalogItem[];
+  session: ApiSession;
+  userRole: UserRole;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
 }
 
-export default function OrderManager({ orders, setOrders, customers, catalog, addToast }: Props) {
+export default function OrderManager({ session, userRole, addToast }: Props) {
+  const [orders, setOrders] = useState<BackendOrden[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState<EstadoOrden | 'all'>('all');
   const [formOpen, setFormOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [detailOrder, setDetailOrder] = useState<BackendOrden | null>(null);
 
-  const nextNumber = `ORD-${new Date().getFullYear()}-${String(orders.length + 1).padStart(3, '0')}`;
-
-  const filtered = orders.filter(o => {
-    const q = search.toLowerCase();
-    const matchQ = !q || o.orderNumber.toLowerCase().includes(q)
-      || o.customerName.toLowerCase().includes(q)
-      || o.motorcyclePlate.toLowerCase().includes(q);
-    const matchS = filterStatus === 'all' || o.status === filterStatus;
-    return matchQ && matchS;
-  }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  function handleSave(data: Omit<Order, 'id'>) {
-    setSaving(true);
-    setTimeout(() => {
-      if (editingOrder) {
-        setOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...data, id: editingOrder.id } : o));
-        addToast({ message: `Orden ${data.orderNumber} actualizada`, type: 'success' });
-      } else {
-        setOrders(prev => [...prev, { ...data, id: Date.now() }]);
-        addToast({ message: `Orden ${data.orderNumber} creada exitosamente`, type: 'success' });
-      }
-      setSaving(false);
-      setFormOpen(false);
-      setEditingOrder(null);
-    }, 600);
+  async function loadOrders() {
+    try {
+      const response = await apiRequest<ApiListResponse<BackendOrden>>('/ordenes', session);
+      setOrders(response.data);
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudieron cargar las órdenes', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function openEdit(o: Order) {
-    setEditingOrder(o);
-    setFormOpen(true);
-  }
+  useEffect(() => {
+    loadOrders();
+  }, [session.token]);
 
-  const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+  const filtered = orders.filter(o =>
+    matchesOrderSearch(o, search) && (filterStatus === 'all' || o.estado === filterStatus),
+  );
+
+  function handleCreated(orden: BackendOrden) {
+    setFormOpen(false);
+    setDetailOrder(orden);
+    loadOrders();
+  }
 
   const columns = [
-    { key: 'orderNumber', header: 'N° Orden', render: (o: Order) => (
-      <span className="font-mono text-xs text-[#f97316]">{o.orderNumber}</span>
+    { key: 'numero', header: 'N° Orden', render: (o: BackendOrden) => (
+      <span className="font-mono text-xs text-[#f97316]">{o.numero}</span>
     )},
-    { key: 'date', header: 'Fecha', render: (o: Order) => (
-      <span className="font-mono text-xs text-[#6e7681]">{new Date(o.createdAt).toLocaleDateString('es-CO')}</span>
+    { key: 'date', header: 'Fecha', render: (o: BackendOrden) => (
+      <span className="font-mono text-xs text-[#6e7681]">{new Date(o.fechaIngreso).toLocaleDateString('es-CO')}</span>
     )},
-    { key: 'customer', header: 'Cliente / Moto', render: (o: Order) => (
+    { key: 'customer', header: 'Cliente / Moto', render: (o: BackendOrden) => (
       <div>
-        <div className="text-sm font-medium text-[#e6edf3]">{o.customerName}</div>
-        <div className="font-mono text-xs text-[#6e7681]">{o.motorcyclePlate} · {o.motorcycleBrand} {o.motorcycleModel}</div>
+        <div className="text-sm font-medium text-[#e6edf3]">{o.cliente?.nombreRazonSocial}</div>
+        <div className="font-mono text-xs text-[#6e7681]">{o.motocicleta?.placa} · {o.motocicleta?.marca} {o.motocicleta?.modelo}</div>
       </div>
     )},
-    { key: 'km', header: 'Km', render: (o: Order) => (
-      <span className="font-mono text-xs text-[#8b949e]">{o.kilometrage.toLocaleString('es-CO')}</span>
+    { key: 'km', header: 'Km', render: (o: BackendOrden) => (
+      <span className="font-mono text-xs text-[#8b949e]">{o.kilometrajeIngreso.toLocaleString('es-CO')}</span>
     )},
-    { key: 'items', header: 'Ítems', render: (o: Order) => (
-      <span className="font-mono text-xs text-[#8b949e]">{o.items.length}</span>
+    { key: 'total', header: 'Total', render: (o: BackendOrden) => (
+      <span className="font-mono text-sm font-semibold text-[#e6edf3]">{formatCOP(o.total)}</span>
     )},
-    { key: 'total', header: 'Total', render: (o: Order) => (
-      <span className="font-mono text-sm font-semibold text-[#e6edf3]">{fmt(o.total)}</span>
+    { key: 'status', header: 'Estado', render: (o: BackendOrden) => (
+      <Badge variant={STATUS_BADGE[o.estado]}>{STATUS_LABELS[o.estado]}</Badge>
     )},
-    { key: 'status', header: 'Estado', render: (o: Order) => (
-      <Badge variant={STATUS_BADGE[o.status]}>{STATUS_LABELS[o.status]}</Badge>
-    )},
-    { key: 'actions', header: '', render: (o: Order) => (
-      <div className="flex gap-1.5 justify-end">
-        <Button size="sm" variant="ghost" onClick={() => setDetailOrder(o)}>Ver</Button>
-        {o.status !== 'finished' && o.status !== 'cancelled' && (
-          <Button size="sm" variant="ghost" onClick={() => openEdit(o)}>Editar</Button>
-        )}
+    { key: 'actions', header: '', render: (o: BackendOrden) => (
+      <div className="flex justify-end">
+        <Button size="sm" variant={isOrderEditable(o.estado) ? 'outline' : 'ghost'} onClick={() => setDetailOrder(o)}>
+          {isOrderEditable(o.estado) ? 'Trabajar' : 'Ver'}
+        </Button>
       </div>
     )},
   ];
 
   const statsData = [
     { label: 'Total órdenes', value: orders.length, color: 'text-[#e6edf3]' },
-    { label: 'Abiertas', value: orders.filter(o => o.status === 'open').length, color: 'text-emerald-400' },
-    { label: 'En proceso', value: orders.filter(o => o.status === 'in_process').length, color: 'text-yellow-400' },
-    { label: 'Finalizadas', value: orders.filter(o => o.status === 'finished').length, color: 'text-blue-400' },
+    { label: 'Abiertas', value: orders.filter(o => o.estado === 'ABIERTA').length, color: 'text-emerald-400' },
+    { label: 'En proceso', value: orders.filter(o => o.estado === 'EN_PROCESO').length, color: 'text-yellow-400' },
+    { label: 'Finalizadas', value: orders.filter(o => o.estado === 'FINALIZADA').length, color: 'text-blue-400' },
   ];
 
   return (
@@ -130,9 +104,11 @@ export default function OrderManager({ orders, setOrders, customers, catalog, ad
           <h1 className="text-xl font-bold text-[#e6edf3]">Órdenes de Servicio</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-02 · HU-03 · Registro y cálculo automático de órdenes</p>
         </div>
-        <Button onClick={() => { setEditingOrder(null); setFormOpen(true); }} icon={<span className="text-base leading-none">+</span>}>
-          Nueva orden
-        </Button>
+        {canCreateOrders(userRole) && (
+          <Button onClick={() => setFormOpen(true)} icon={<span className="text-base leading-none">+</span>}>
+            Nueva orden
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -159,35 +135,28 @@ export default function OrderManager({ orders, setOrders, customers, catalog, ad
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage="No se encontraron órdenes de servicio" />
+      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando órdenes...' : 'No se encontraron órdenes de servicio'} />
 
-      {/* Form Modal */}
-      <Modal
-        title={editingOrder ? `Editar ${editingOrder.orderNumber}` : 'Nueva orden de servicio'}
-        open={formOpen}
-        onClose={() => { setFormOpen(false); setEditingOrder(null); }}
-        width="max-w-3xl"
-      >
-        <OrderForm
-          customers={customers}
-          catalog={catalog}
-          editing={editingOrder}
-          nextOrderNumber={nextNumber}
-          onSave={handleSave}
-          onCancel={() => { setFormOpen(false); setEditingOrder(null); }}
-          saving={saving}
-        />
+      <Modal title="Nueva orden de servicio" open={formOpen} onClose={() => setFormOpen(false)} width="max-w-3xl">
+        {formOpen && (
+          <OrderForm session={session} addToast={addToast} onCreated={handleCreated} onCancel={() => setFormOpen(false)} />
+        )}
       </Modal>
 
-      {/* Detail Modal */}
       {detailOrder && (
         <Modal
-          title={`Detalle — ${detailOrder.orderNumber}`}
+          title={`Orden ${detailOrder.numero}`}
           open={!!detailOrder}
           onClose={() => setDetailOrder(null)}
-          width="max-w-2xl"
+          width="max-w-3xl"
         >
-          <OrderDetail order={orders.find(o => o.id === detailOrder.id) ?? detailOrder} />
+          <OrderDetail
+            orderId={detailOrder.id}
+            session={session}
+            addToast={addToast}
+            userRole={userRole}
+            onChanged={loadOrders}
+          />
         </Modal>
       )}
     </div>

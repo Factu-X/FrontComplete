@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -8,7 +8,22 @@ import DataTable from '../molecules/DataTable';
 import SearchBar from '../molecules/SearchBar';
 import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
-import { CatalogItem } from '../../types';
+import { apiRequest, ApiSession, ApiListResponse, ApiEntityResponse } from '../../lib/api';
+import { formatCOP } from '../../lib/orders';
+import { canManageCatalog } from '../../lib/roles';
+import type { BackendCatalogItem, TratamientoIva, UserRole } from '../../lib/types';
+
+interface CatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  type: 'service' | 'part';
+  price: number;
+  ivaTreatment: TratamientoIva;
+  taxRate: number;
+  active: boolean;
+}
 
 const typeOptions = [
   { value: '', label: 'Todos los tipos' },
@@ -21,43 +36,100 @@ const formTypeOptions = [
   { value: 'part', label: 'Repuesto' },
 ];
 
-const emptyForm = { code: '', name: '', description: '', type: 'service' as 'service' | 'part', price: 0 };
+const ivaOptions = [
+  { value: 'GRAVADO', label: 'Gravado' },
+  { value: 'EXENTO', label: 'Exento' },
+  { value: 'EXCLUIDO', label: 'Excluido' },
+];
+
+type CatalogForm = {
+  code: string;
+  name: string;
+  description: string;
+  type: CatalogItem['type'];
+  price: number;
+  ivaTreatment: TratamientoIva;
+  taxRate: number;
+};
+
+const empty: CatalogForm = {
+  code: '', name: '', description: '', type: 'service', price: 0, ivaTreatment: 'GRAVADO', taxRate: 19,
+};
 
 interface Props {
-  catalog: CatalogItem[];
-  setCatalog: React.Dispatch<React.SetStateAction<CatalogItem[]>>;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  session: ApiSession;
+  userRole: UserRole;
 }
 
-export default function CatalogManager({ catalog, setCatalog, addToast }: Props) {
+const mapCatalogItem = (item: BackendCatalogItem): CatalogItem => ({
+  id: item.id,
+  code: item.codigo,
+  name: item.nombre,
+  description: item.descripcion ?? '',
+  type: item.tipo === 'SERVICIO' ? 'service' : 'part',
+  price: Number(item.precioVenta),
+  ivaTreatment: item.tratamientoIva,
+  taxRate: Number(item.tarifaIva),
+  active: item.activo,
+});
+
+const toBackendType = (type: CatalogItem['type']) => (type === 'service' ? 'SERVICIO' : 'REPUESTO');
+
+export default function CatalogManager({ addToast, session, userRole }: Props) {
+  const [items, setItems] = useState<CatalogItem[]>([]);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterActive, setFilterActive] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmToggle, setConfirmToggle] = useState<CatalogItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = catalog.filter(i => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q);
-    const matchType = !filterType || i.type === filterType;
-    const matchActive = filterActive === 'all' || (filterActive === 'active' ? i.active : !i.active);
-    return matchSearch && matchType && matchActive;
-  });
+  const canWrite = canManageCatalog(userRole);
+
+  async function loadCatalog() {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      if (filterType) params.set('tipo', toBackendType(filterType as CatalogItem['type']));
+      if (filterActive !== 'all') params.set('activo', filterActive === 'active' ? 'true' : 'false');
+
+      const response = await apiRequest<ApiListResponse<BackendCatalogItem>>(
+        `/catalogo${params.toString() ? `?${params.toString()}` : ''}`,
+        session,
+      );
+      setItems(response.data.map(mapCatalogItem));
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar el catálogo', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCatalog();
+  }, [session.token, search, filterType, filterActive]);
 
   function openCreate() {
+    if (!canWrite) return;
     setEditing(null);
-    setForm(emptyForm);
+    setForm(empty);
     setErrors({});
     setModalOpen(true);
   }
 
   function openEdit(item: CatalogItem) {
+    if (!canWrite) return;
     setEditing(item);
-    setForm({ code: item.code, name: item.name, description: item.description, type: item.type, price: item.price });
+    setForm({
+      code: item.code, name: item.name, description: item.description, type: item.type,
+      price: item.price, ivaTreatment: item.ivaTreatment, taxRate: item.taxRate,
+    });
     setErrors({});
     setModalOpen(true);
   }
@@ -68,36 +140,65 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
     if (!form.name.trim()) e.name = 'El nombre es obligatorio';
     if (!form.type) e.type = 'El tipo es obligatorio';
     if (!form.price || form.price <= 0) e.price = 'El precio debe ser mayor a 0';
-    if (!editing && catalog.find(i => i.code.toLowerCase() === form.code.toLowerCase()))
+    if (form.ivaTreatment === 'GRAVADO' && (form.taxRate <= 0 || form.taxRate > 100))
+      e.taxRate = 'La tarifa debe estar entre 0 y 100';
+    if (!editing && items.find(i => i.code.toLowerCase() === form.code.toLowerCase()))
       e.code = 'El código ya existe en el catálogo';
     return e;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        codigo: form.code,
+        nombre: form.name,
+        descripcion: form.description || null,
+        tipo: toBackendType(form.type),
+        precioVenta: form.price,
+        tratamientoIva: form.ivaTreatment,
+        // El backend exige tarifa 0 para items exentos o excluidos.
+        tarifaIva: form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0,
+      };
+
       if (editing) {
-        setCatalog(prev => prev.map(i => i.id === editing.id ? { ...i, ...form } : i));
+        await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${editing.id}`, session, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
         addToast({ message: 'Elemento actualizado correctamente', type: 'success' });
       } else {
-        setCatalog(prev => [...prev, { ...form, id: Date.now(), active: true }]);
+        await apiRequest<ApiEntityResponse<BackendCatalogItem>>('/catalogo', session, {
+          method: 'POST',
+          body: JSON.stringify({ ...payload, activo: true }),
+        });
         addToast({ message: 'Elemento registrado en el catálogo', type: 'success' });
       }
-      setSaving(false);
       setModalOpen(false);
-    }, 600);
+      await loadCatalog();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el elemento', type: 'error' });
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleToggle() {
+  async function handleToggle() {
     if (!confirmToggle) return;
-    setCatalog(prev => prev.map(i => i.id === confirmToggle.id ? { ...i, active: !i.active } : i));
-    addToast({ message: confirmToggle.active ? 'Elemento desactivado' : 'Elemento activado', type: 'warning' });
-    setConfirmToggle(null);
+    try {
+      await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${confirmToggle.id}`, session, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo: !confirmToggle.active }),
+      });
+      addToast({ message: confirmToggle.active ? 'Elemento desactivado' : 'Elemento activado', type: 'warning' });
+      setConfirmToggle(null);
+      await loadCatalog();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo cambiar el estado', type: 'error' });
+    }
   }
-
-  const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 
   const columns = [
     { key: 'code', header: 'Código', mono: true },
@@ -113,19 +214,24 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
       </Badge>
     )},
     { key: 'price', header: 'Precio', render: (r: CatalogItem) => (
-      <span className="font-mono text-xs text-[#e6edf3]">{fmt(r.price)}</span>
+      <span className="font-mono text-xs text-[#e6edf3]">{formatCOP(r.price)}</span>
+    )},
+    { key: 'iva', header: 'IVA', render: (r: CatalogItem) => (
+      <span className="font-mono text-xs text-[#8b949e]">
+        {r.ivaTreatment === 'GRAVADO' ? `${r.taxRate}%` : r.ivaTreatment.toLowerCase()}
+      </span>
     )},
     { key: 'active', header: 'Estado', render: (r: CatalogItem) => (
       <Badge variant={r.active ? 'active' : 'inactive'}>{r.active ? 'Activo' : 'Inactivo'}</Badge>
     )},
-    { key: 'actions', header: '', render: (r: CatalogItem) => (
+    { key: 'actions', header: '', render: (r: CatalogItem) => canWrite ? (
       <div className="flex gap-1.5 justify-end">
         <Button size="sm" variant="ghost" onClick={() => openEdit(r)}>Editar</Button>
         <Button size="sm" variant={r.active ? 'ghost' : 'outline'} onClick={() => setConfirmToggle(r)}>
           {r.active ? 'Desactivar' : 'Activar'}
         </Button>
       </div>
-    )},
+    ) : <span className="text-xs text-[#6e7681]">Solo lectura</span>},
   ];
 
   return (
@@ -135,7 +241,7 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
           <h1 className="text-xl font-bold text-[#e6edf3]">Catálogo de Servicios y Repuestos</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-01 · Gestión del catálogo comercial del taller</p>
         </div>
-        <Button onClick={openCreate} icon={<span className="text-base leading-none">+</span>}>Nuevo elemento</Button>
+        {canWrite && <Button onClick={openCreate} icon={<span className="text-base leading-none">+</span>}>Nuevo elemento</Button>}
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">
@@ -154,10 +260,10 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total elementos', value: catalog.length, color: 'text-[#e6edf3]' },
-          { label: 'Servicios activos', value: catalog.filter(i => i.type === 'service' && i.active).length, color: 'text-blue-400' },
-          { label: 'Repuestos activos', value: catalog.filter(i => i.type === 'part' && i.active).length, color: 'text-violet-400' },
-          { label: 'Inactivos', value: catalog.filter(i => !i.active).length, color: 'text-[#6e7681]' },
+          { label: 'Total elementos', value: items.length, color: 'text-[#e6edf3]' },
+          { label: 'Servicios activos', value: items.filter(i => i.type === 'service' && i.active).length, color: 'text-blue-400' },
+          { label: 'Repuestos activos', value: items.filter(i => i.type === 'part' && i.active).length, color: 'text-violet-400' },
+          { label: 'Inactivos', value: items.filter(i => !i.active).length, color: 'text-[#6e7681]' },
         ].map(stat => (
           <div key={stat.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3">
             <div className={`text-2xl font-bold font-mono ${stat.color}`}>{stat.value}</div>
@@ -166,7 +272,7 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
         ))}
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage="No se encontraron elementos" />
+      <DataTable columns={columns} data={items} emptyMessage={loading ? 'Cargando catálogo...' : 'No se encontraron elementos'} />
 
       <Modal
         title={editing ? 'Editar elemento del catálogo' : 'Nuevo elemento del catálogo'}
@@ -218,6 +324,22 @@ export default function CatalogManager({ catalog, setCatalog, addToast }: Props)
             error={errors.price}
             placeholder="45000"
           />
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Tratamiento IVA *"
+              options={ivaOptions}
+              value={form.ivaTreatment}
+              onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva }))}
+            />
+            <Input
+              label="Tarifa IVA (%)"
+              type="number"
+              value={form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0}
+              onChange={e => setForm(f => ({ ...f, taxRate: Number(e.target.value) }))}
+              error={errors.taxRate}
+              disabled={form.ivaTreatment !== 'GRAVADO'}
+            />
+          </div>
         </div>
       </Modal>
 

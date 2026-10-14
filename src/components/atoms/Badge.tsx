@@ -1,6 +1,6 @@
 import React from 'react';
 
-type BadgeVariant = 'active' | 'inactive' | 'service' | 'part' | 'admin' | 'operator' | 'warning';
+type BadgeVariant = 'active' | 'inactive' | 'service' | 'part' | 'admin' | 'operator' | 'billing' | 'warning';
 
 const variantMap: Record<BadgeVariant, string> = {
   active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
@@ -9,6 +9,7 @@ const variantMap: Record<BadgeVariant, string> = {
   part: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
   admin: 'bg-[#f97316]/15 text-[#f97316] border-[#f97316]/30',
   operator: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+  billing: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   warning: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
 };
 

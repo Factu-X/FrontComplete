@@ -3,14 +3,12 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { apiRequest } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
-import type { AuthUser, BackendProfile, UserRole } from '../../lib/types';
+import { roleFromProfile } from '../../lib/roles';
+import type { AuthUser, BackendProfile } from '../../lib/types';
 
 interface LoginPageProps {
   onLogin: (user: AuthUser, token: string) => void;
 }
-
-const roleFromProfile = (rol: BackendProfile['rol']): UserRole =>
-  rol === 'ADMINISTRADOR' ? 'admin' : 'operator';
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('');
@@ -31,7 +29,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       });
 
       if (authError || !data.session || !data.user.email) {
-        setError(authError?.message ?? 'Las credenciales ingresadas son incorrectas.');
+        // HU-12: mensaje genérico; no revela si el correo existe.
+        setError(authError?.code === 'user_banned'
+          ? 'Tu cuenta está desactivada. Contacta al administrador.'
+          : 'Correo o contraseña incorrectos.');
         return;
       }
 
@@ -48,7 +49,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         data.session.access_token,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No fue posible iniciar sesion.');
+      // Sin profile activo no debe quedar una sesión de Supabase abierta.
+      await supabase.auth.signOut();
+      setError(err instanceof Error ? err.message : 'No fue posible iniciar sesión.');
     } finally {
       setLoading(false);
     }
