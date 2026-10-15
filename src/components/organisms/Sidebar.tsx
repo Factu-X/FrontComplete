@@ -1,4 +1,6 @@
 import React from 'react';
+import { canAccessPage, ROLE_LABELS } from '../../lib/roles';
+import type { UserRole } from '../../lib/types';
 
 export type Page =
   | 'dashboard' | 'orders' | 'catalog' | 'customers'
@@ -9,7 +11,6 @@ interface NavItem {
   id: Page;
   label: string;
   icon: string;
-  adminOnly?: boolean;
   group?: string;
 }
 
@@ -23,9 +24,9 @@ const navItems: NavItem[] = [
   { id: 'credit-notes', label: 'Notas Crédito', icon: '↩', group: 'ops' },
   { id: 'receivables', label: 'Cartera', icon: '◑', group: 'ops' },
   { id: 'billing-dashboard', label: 'Resumen Billing', icon: '▤', group: 'ops' },
-  { id: 'settings', label: 'Configuración', icon: '⚙', group: 'admin', adminOnly: true },
-  { id: 'users', label: 'Usuarios', icon: '⊙', group: 'admin', adminOnly: true },
-  { id: 'usability', label: 'Usabilidad', icon: '◫', group: 'admin', adminOnly: true },
+  { id: 'settings', label: 'Configuración', icon: '⚙', group: 'admin' },
+  { id: 'users', label: 'Usuarios', icon: '⊙', group: 'admin' },
+  { id: 'usability', label: 'Usabilidad', icon: '◫', group: 'admin' },
   { id: 'help', label: 'Ayuda', icon: '?', group: 'support' },
 ];
 
@@ -39,7 +40,7 @@ const groupLabels: Record<string, string> = {
 interface SidebarProps {
   current: Page;
   onNavigate: (p: Page) => void;
-  userRole: 'admin' | 'operator';
+  userRole: UserRole;
   userName: string;
   onLogout: () => void;
   orderCount?: number;
@@ -52,8 +53,8 @@ export default function Sidebar({
   current, onNavigate, userRole, userName, onLogout,
   orderCount = 0, reminderCount = 0, configComplete = true, pendingReceivables = 0,
 }: SidebarProps) {
-  const visibleItems = navItems.filter(i => !i.adminOnly || userRole === 'admin');
-  const groups = ['main', 'ops', ...(userRole === 'admin' ? ['admin'] : []), 'support'];
+  const visibleItems = navItems.filter(i => canAccessPage(userRole, i.id));
+  const groups = ['main', 'ops', 'admin', 'support'];
 
   return (
     <aside className="w-60 shrink-0 bg-[#161b22] border-r border-[#30363d] flex flex-col h-screen sticky top-0">
@@ -119,7 +120,7 @@ export default function Sidebar({
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium text-[#e6edf3] truncate">{userName}</div>
-              <div className="text-[10px] text-[#6e7681] capitalize">{userRole}</div>
+              <div className="text-[10px] text-[#6e7681]">{ROLE_LABELS[userRole]}</div>
             </div>
             <button onClick={onLogout} title="Cerrar sesión" className="text-[#6e7681] hover:text-[#ef4444] transition-colors text-sm">⇥</button>
           </div>

@@ -101,10 +101,6 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
     setNewFinding({ description: '', priority: 'high', screen: '' });
   }
 
-  function toggleResolved(id: number) {
-    setFindings(prev => prev.map(f => f.id === id ? { ...f, resolved: !f.resolved } : f));
-  }
-
   const allFindings = sessions.flatMap(s => s.findings);
   const criticalCount = allFindings.filter(f => f.priority === 'critical' && !f.resolved).length;
 

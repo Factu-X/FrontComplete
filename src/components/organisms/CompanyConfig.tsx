@@ -35,7 +35,6 @@ export default function CompanyConfigPage({ config, setConfig, addToast }: Props
   const [draft, setDraft] = useState<CompanyConfig>({ ...config });
   const [saving, setSaving] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
-  const [certFile, setCertFile] = useState<string>('');
 
   const { missing, hasCreds, complete } = checkCompletion(config);
 
@@ -331,7 +330,6 @@ export default function CompanyConfigPage({ config, setConfig, addToast }: Props
                         const file = e.target.files?.[0];
                         if (file) {
                           setDraft(d => ({ ...d, hasCertificate: true, certificateName: file.name }));
-                          setCertFile(file.name);
                         }
                       }}
                     />

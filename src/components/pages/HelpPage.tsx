@@ -6,7 +6,7 @@ const SECTIONS = [
     icon: '🔐',
     title: 'Acceso al sistema',
     content: [
-      { subtitle: 'Iniciar sesión', text: 'Ingrese sus credenciales de usuario en la pantalla de inicio. FactuX soporta roles de Administrador y Operador. Los administradores tienen acceso completo; los operadores tienen acceso restringido a clientes, órdenes e historial.' },
+      { subtitle: 'Iniciar sesión', text: 'Ingrese sus credenciales de usuario en la pantalla de inicio. FactuX maneja tres roles: Administrador (acceso completo, usuarios, catálogo y configuración), Facturación (clientes, motocicletas, órdenes y facturas) y Operario (consulta y actualiza el trabajo de las órdenes).' },
       { subtitle: 'Credenciales de demo', text: 'Usuario demo: admin@factux.co — Contraseña: admin123. Para operador: operador@factux.co — Password: op456. Estas credenciales son solo para demostración.' },
       { subtitle: 'Seguridad', text: 'Las credenciales se gestionan en la interfaz y en producción deben configurarse como variables de entorno seguras. Nunca se almacenan en texto plano en el código fuente.' },
     ],

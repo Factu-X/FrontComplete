@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -9,26 +9,65 @@ import SearchBar from '../molecules/SearchBar';
 import ConfirmDialog from '../molecules/ConfirmDialog';
 import MotorcycleHistory from './MotorcycleHistory';
 import { ToastItem } from '../molecules/ToastContainer';
-import { Customer, Motorcycle, Order } from '../../types';
+import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
+import type { BackendCliente, BackendMotocicleta } from '../../lib/types';
+import { isValidMotorcyclePlate, normalizeMotorcyclePlate } from '../../lib/plates';
+
+interface Motorcycle {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number | null;
+  active: boolean;
+}
+
+interface Customer {
+  id: string;
+  idType: string;
+  idNumber: string;
+  name: string;
+  phone: string;
+  email: string;
+  motorcycles: Motorcycle[];
+}
 
 const idTypes = [
   { value: 'CC', label: 'Cédula de Ciudadanía (CC)' },
   { value: 'NIT', label: 'NIT' },
   { value: 'CE', label: 'Cédula de Extranjería (CE)' },
-  { value: 'PAS', label: 'Pasaporte' },
+  { value: 'PASAPORTE', label: 'Pasaporte' },
 ];
 
 const emptyCustomer = { idType: 'CC', idNumber: '', name: '', phone: '', email: '' };
 const emptyMoto = { plate: '', brand: '', model: '', year: new Date().getFullYear() };
 
 interface Props {
-  customers: Customer[];
-  setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
-  orders: Order[];
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  session: ApiSession;
 }
 
-export default function CustomerManager({ customers, setCustomers, orders, addToast }: Props) {
+const mapMoto = (moto: BackendMotocicleta): Motorcycle => ({
+  id: moto.id,
+  plate: moto.placa,
+  brand: moto.marca,
+  model: moto.modelo,
+  year: moto.anio,
+  active: moto.activa,
+});
+
+const mapCustomer = (customer: BackendCliente, motorcycles: Motorcycle[]): Customer => ({
+  id: customer.id,
+  idType: customer.tipoIdentificacion,
+  idNumber: customer.numeroIdentificacion,
+  name: customer.nombreRazonSocial,
+  phone: customer.telefono ?? '',
+  email: customer.email ?? '',
+  motorcycles,
+});
+
+export default function CustomerManager({ addToast, session }: Props) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -44,10 +83,47 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
 
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ customer: Customer; moto: Motorcycle } | null>(null);
-
+  const [loading, setLoading] = useState(true);
   const [historyMoto, setHistoryMoto] = useState<{ moto: Motorcycle; customerName: string } | null>(null);
 
-  const allPlates = customers.flatMap(c => c.motorcycles.map(m => m.plate));
+  const [editingMoto, setEditingMoto] = useState<Motorcycle | null>(null);
+
+  const activePlates = customers.flatMap(c => c.motorcycles.filter(m => m.active).map(m => m.plate));
+
+  async function loadCustomers() {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+
+      const response = await apiRequest<ApiListResponse<BackendCliente>>(
+        `/clientes${params.toString() ? `?${params.toString()}` : ''}`,
+        session,
+      );
+
+      // shortcut: una request de motos por cliente; agregar include en GET /clientes si la lista crece.
+      const hydrated = await Promise.all(response.data.map(async customer => {
+        const motos = await apiRequest<ApiListResponse<BackendMotocicleta>>(
+          `/clientes/${customer.id}/motocicletas`,
+          session,
+        );
+        return mapCustomer(customer, motos.data.map(mapMoto));
+      }));
+
+      setCustomers(hydrated);
+      if (detailCustomer) {
+        setDetailCustomer(hydrated.find(customer => customer.id === detailCustomer.id) ?? null);
+      }
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudieron cargar clientes', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCustomers();
+  }, [session.token, search]);
 
   const filtered = customers.filter(c => {
     const q = search.toLowerCase();
@@ -81,28 +157,54 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
     return e;
   }
 
-  function handleSaveCustomer() {
+  async function handleSaveCustomer() {
     const e = validateCustomer();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        tipoIdentificacion: form.idType,
+        numeroIdentificacion: form.idNumber,
+        nombreRazonSocial: form.name,
+        telefono: form.phone || null,
+        email: form.email || null,
+        activo: true,
+      };
+
       if (editingCustomer) {
-        setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? { ...c, ...form } : c));
-        if (detailCustomer?.id === editingCustomer.id) setDetailCustomer(prev => prev ? { ...prev, ...form } : null);
+        await apiRequest<ApiEntityResponse<BackendCliente>>(`/clientes/${editingCustomer.id}`, session, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
         addToast({ message: 'Cliente actualizado correctamente', type: 'success' });
       } else {
-        const newC: Customer = { ...form, id: Date.now(), motorcycles: [] };
-        setCustomers(prev => [...prev, newC]);
+        await apiRequest<ApiEntityResponse<BackendCliente>>('/clientes', session, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
         addToast({ message: 'Cliente registrado exitosamente', type: 'success' });
       }
-      setSaving(false);
       setModalOpen(false);
-    }, 500);
+      await loadCustomers();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el cliente', type: 'error' });
+    } finally {
+      setSaving(false);
+    }
   }
 
   function openAddMoto(c: Customer) {
     setMotoCustomer(c);
+    setEditingMoto(null);
     setMotoForm(emptyMoto);
+    setMotoErrors({});
+    setMotoModal(true);
+  }
+
+  function openEditMoto(c: Customer, m: Motorcycle) {
+    setMotoCustomer(c);
+    setEditingMoto(m);
+    setMotoForm({ plate: m.plate, brand: m.brand, model: m.model, year: m.year ?? new Date().getFullYear() });
     setMotoErrors({});
     setMotoModal(true);
   }
@@ -113,34 +215,56 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
     if (!motoForm.brand.trim()) e.brand = 'La marca es obligatoria';
     if (!motoForm.model.trim()) e.model = 'El modelo es obligatorio';
     if (!motoForm.year || motoForm.year < 1990 || motoForm.year > new Date().getFullYear() + 1) e.year = 'Año inválido';
-    const plateUp = motoForm.plate.toUpperCase().trim();
-    if (allPlates.some(p => p === plateUp)) e.plate = 'Esta placa ya está registrada en el sistema';
+    const plateUp = normalizeMotorcyclePlate(motoForm.plate);
+    if (plateUp && !isValidMotorcyclePlate(plateUp)) e.plate = 'La placa debe tener formato AAA00A';
+    if (!editingMoto && activePlates.some(p => p === plateUp)) e.plate = 'Esta placa ya está registrada en una moto activa';
     return e;
   }
 
-  function handleSaveMoto() {
+  async function handleSaveMoto() {
     const e = validateMoto();
     if (Object.keys(e).length) { setMotoErrors(e); return; }
+    if (!motoCustomer) return;
     setMotoSaving(true);
-    setTimeout(() => {
-      const newMoto: Motorcycle = { ...motoForm, id: Date.now(), plate: motoForm.plate.toUpperCase().trim() };
-      setCustomers(prev => prev.map(c => c.id === motoCustomer!.id ? { ...c, motorcycles: [...c.motorcycles, newMoto] } : c));
-      if (detailCustomer?.id === motoCustomer!.id)
-        setDetailCustomer(prev => prev ? { ...prev, motorcycles: [...prev.motorcycles, newMoto] } : null);
-      addToast({ message: `Motocicleta ${newMoto.plate} registrada`, type: 'success' });
-      setMotoSaving(false);
+    try {
+      const descriptive = { marca: motoForm.brand, modelo: motoForm.model, anio: motoForm.year };
+      if (editingMoto) {
+        await apiRequest<ApiEntityResponse<BackendMotocicleta>>(`/motocicletas/${editingMoto.id}`, session, {
+          method: 'PATCH',
+          body: JSON.stringify(descriptive),
+        });
+        addToast({ message: `Motocicleta ${editingMoto.plate} actualizada`, type: 'success' });
+      } else {
+        const response = await apiRequest<ApiEntityResponse<BackendMotocicleta>>(
+          `/clientes/${motoCustomer.id}/motocicletas`,
+          session,
+          { method: 'POST', body: JSON.stringify({ ...descriptive, placa: motoForm.plate, activa: true }) },
+        );
+        addToast({ message: `Motocicleta ${response.data.placa} registrada`, type: 'success' });
+      }
       setMotoModal(false);
-    }, 500);
+      await loadCustomers();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar la motocicleta', type: 'error' });
+    } finally {
+      setMotoSaving(false);
+    }
   }
 
-  function handleDeleteMoto() {
+  async function handleDeleteMoto() {
     if (!deleteConfirm) return;
-    const { customer, moto } = deleteConfirm;
-    setCustomers(prev => prev.map(c => c.id === customer.id ? { ...c, motorcycles: c.motorcycles.filter(m => m.id !== moto.id) } : c));
-    if (detailCustomer?.id === customer.id)
-      setDetailCustomer(prev => prev ? { ...prev, motorcycles: prev.motorcycles.filter(m => m.id !== moto.id) } : null);
-    addToast({ message: `Motocicleta ${moto.plate} eliminada`, type: 'warning' });
-    setDeleteConfirm(null);
+    const { moto } = deleteConfirm;
+    try {
+      await apiRequest<ApiEntityResponse<BackendMotocicleta>>(`/motocicletas/${moto.id}`, session, {
+        method: 'PATCH',
+        body: JSON.stringify({ activa: false }),
+      });
+      addToast({ message: `Motocicleta ${moto.plate} desactivada`, type: 'warning' });
+      setDeleteConfirm(null);
+      await loadCustomers();
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo desactivar la motocicleta', type: 'error' });
+    }
   }
 
   const motoColumns = [
@@ -148,19 +272,21 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
     { key: 'brand', header: 'Marca' },
     { key: 'model', header: 'Modelo' },
     { key: 'year', header: 'Año', mono: true },
-    { key: 'orders', header: 'Órdenes', render: (m: Motorcycle) => {
-      const count = orders.filter(o => o.motorcycleId === m.id).length;
-      return <span className="font-mono text-xs text-[#8b949e]">{count}</span>;
-    }},
+    { key: 'active', header: 'Estado', render: (m: Motorcycle) => (
+      <Badge variant={m.active ? 'active' : 'inactive'}>{m.active ? 'Activa' : 'Inactiva'}</Badge>
+    )},
     { key: 'actions', header: '', render: (m: Motorcycle) => (
       <div className="flex gap-1.5 justify-end">
         <Button size="sm" variant="outline" onClick={() => setHistoryMoto({ moto: m, customerName: detailCustomer!.name })}>
           Historial
         </Button>
-        <button
-          onClick={() => setDeleteConfirm({ customer: detailCustomer!, moto: m })}
-          className="text-xs text-[#ef4444]/70 hover:text-[#ef4444] transition-colors px-2"
-        >Eliminar</button>
+        <Button size="sm" variant="ghost" onClick={() => openEditMoto(detailCustomer!, m)}>Editar</Button>
+        {m.active && (
+          <button
+            onClick={() => setDeleteConfirm({ customer: detailCustomer!, moto: m })}
+            className="text-xs text-[#ef4444]/70 hover:text-[#ef4444] transition-colors px-2"
+          >Desactivar</button>
+        )}
       </div>
     )},
   ];
@@ -204,7 +330,7 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
         {[
           { label: 'Clientes registrados', value: customers.length, color: 'text-[#e6edf3]' },
           { label: 'Motocicletas activas', value: customers.reduce((s, c) => s + c.motorcycles.length, 0), color: 'text-[#f97316]' },
-          { label: 'Con historial de servicios', value: customers.filter(c => c.motorcycles.some(m => orders.some(o => o.motorcycleId === m.id))).length, color: 'text-blue-400' },
+          { label: 'Promedio motos/cliente', value: (customers.reduce((s, c) => s + c.motorcycles.length, 0) / customers.length || 0).toFixed(1), color: 'text-blue-400' },
         ].map(stat => (
           <div key={stat.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3">
             <div className={`text-2xl font-bold font-mono ${stat.color}`}>{stat.value}</div>
@@ -214,7 +340,7 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
       </div>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre, identificación o teléfono..." />
-      <DataTable columns={customerColumns} data={filtered} emptyMessage="No se encontraron clientes" />
+      <DataTable columns={customerColumns} data={filtered} emptyMessage={loading ? 'Cargando clientes...' : 'No se encontraron clientes'} />
 
       {/* Customer Form Modal */}
       <Modal
@@ -271,7 +397,7 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
 
       {/* Customer Detail Modal */}
       <Modal
-        title={detailCustomer?.name ?? ''}
+        title={`${detailCustomer?.name ?? ''}`}
         open={!!detailCustomer}
         onClose={() => setDetailCustomer(null)}
         width="max-w-2xl"
@@ -286,9 +412,7 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#e6edf3]">Motocicletas ({detailCustomer.motorcycles.length})</h3>
-                <Button size="sm" variant="outline" onClick={() => { setMotoCustomer(detailCustomer); setMotoForm(emptyMoto); setMotoErrors({}); setMotoModal(true); }}>
-                  + Agregar moto
-                </Button>
+                <Button size="sm" variant="outline" onClick={() => openAddMoto(detailCustomer)}>+ Agregar moto</Button>
               </div>
               <DataTable columns={motoColumns} data={detailCustomer.motorcycles} emptyMessage="Sin motocicletas registradas" />
             </div>
@@ -298,20 +422,21 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
 
       {/* Moto Form Modal */}
       <Modal
-        title={`Registrar motocicleta — ${motoCustomer?.name ?? ''}`}
+        title={`${editingMoto ? 'Editar' : 'Registrar'} motocicleta — ${motoCustomer?.name ?? ''}`}
         open={motoModal}
         onClose={() => setMotoModal(false)}
         onConfirm={handleSaveMoto}
         loading={motoSaving}
-        confirmLabel="Registrar moto"
+        confirmLabel={editingMoto ? 'Guardar cambios' : 'Registrar moto'}
       >
         <div className="flex flex-col gap-4">
           <Input
             label="Placa *"
             value={motoForm.plate}
-            onChange={e => setMotoForm(f => ({ ...f, plate: e.target.value.toUpperCase() }))}
+            onChange={e => setMotoForm(f => ({ ...f, plate: normalizeMotorcyclePlate(e.target.value) }))}
             error={motoErrors.plate}
-            placeholder="BYK456"
+            placeholder="ABC12D"
+            disabled={!!editingMoto}
           />
           <div className="grid grid-cols-2 gap-3">
             <Input
@@ -343,8 +468,8 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
       <ConfirmDialog
         open={!!deleteConfirm}
         title="Eliminar motocicleta"
-        message={`¿Eliminar la motocicleta ${deleteConfirm?.moto.plate} (${deleteConfirm?.moto.brand} ${deleteConfirm?.moto.model})? Esta acción no afecta el historial de órdenes.`}
-        confirmLabel="Eliminar"
+        message={`¿Desactivar la motocicleta ${deleteConfirm?.moto.plate} (${deleteConfirm?.moto.brand} ${deleteConfirm?.moto.model})? Esta acción conserva el historial de órdenes.`}
+        confirmLabel="Desactivar"
         destructive
         onConfirm={handleDeleteMoto}
         onClose={() => setDeleteConfirm(null)}
@@ -354,7 +479,8 @@ export default function CustomerManager({ customers, setCustomers, orders, addTo
         <MotorcycleHistory
           motorcycle={historyMoto.moto}
           customerName={historyMoto.customerName}
-          orders={orders}
+          session={session}
+          addToast={addToast}
           open={!!historyMoto}
           onClose={() => setHistoryMoto(null)}
         />

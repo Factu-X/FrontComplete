@@ -19,7 +19,7 @@ interface Props {
   setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>>;
 }
 
-export default function AccountsReceivable({ invoices, setInvoices }: Props) {
+export default function AccountsReceivable({ invoices }: Props) {
   const [search, setSearch] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [dateFrom, setDateFrom] = useState('');

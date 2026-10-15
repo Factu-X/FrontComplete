@@ -1,38 +1,42 @@
-import React from 'react';
-import { Order, Customer, CatalogItem } from '../../types';
+import React, { useEffect, useState } from 'react';
+import { apiRequest, ApiListResponse, ApiSession } from '../../lib/api';
+import { formatCOP, STATUS_LABELS } from '../../lib/orders';
+import { canAccessPage, canCreateOrders } from '../../lib/roles';
+import type { BackendCatalogItem, BackendCliente, BackendOrden, UserRole } from '../../lib/types';
 
 interface DashboardPageProps {
-  userRole: 'admin' | 'operator';
+  userRole: UserRole;
   userName: string;
   onNavigate: (p: string) => void;
-  orders: Order[];
-  customers: Customer[];
-  catalog: CatalogItem[];
+  session: ApiSession;
 }
 
-export default function DashboardPage({ userRole, userName, onNavigate, orders, customers, catalog }: DashboardPageProps) {
+export default function DashboardPage({ userRole, userName, onNavigate, session }: DashboardPageProps) {
+  const [orders, setOrders] = useState<BackendOrden[]>([]);
+  const [customers, setCustomers] = useState<BackendCliente[]>([]);
+  const [catalog, setCatalog] = useState<BackendCatalogItem[]>([]);
+
+  useEffect(() => {
+    // Cada KPI es independiente: si un endpoint falla, los demás se siguen mostrando.
+    apiRequest<ApiListResponse<BackendOrden>>('/ordenes', session).then(r => setOrders(r.data)).catch(() => undefined);
+    apiRequest<ApiListResponse<BackendCliente>>('/clientes', session).then(r => setCustomers(r.data)).catch(() => undefined);
+    apiRequest<ApiListResponse<BackendCatalogItem>>('/catalogo?activo=true', session).then(r => setCatalog(r.data)).catch(() => undefined);
+  }, [session.token]);
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
 
-  const openOrders = orders.filter(o => o.status === 'open' || o.status === 'in_process');
-  const totalRevenue = orders.filter(o => o.status === 'finished').reduce((s, o) => s + o.total, 0);
-  const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
-
-  const recentOrders = [...orders]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+  const openOrders = orders.filter(o => o.estado === 'ABIERTA' || o.estado === 'EN_PROCESO');
+  const finishedOrders = orders.filter(o => o.estado === 'FINALIZADA');
+  const totalRevenue = finishedOrders.reduce((s, o) => s + Number(o.total), 0);
+  // El backend ya ordena por fecha de ingreso descendente.
+  const recentOrders = orders.slice(0, 5);
 
   const statusColor: Record<string, string> = {
-    open: 'text-emerald-400',
-    in_process: 'text-yellow-400',
-    finished: 'text-blue-400',
-    cancelled: 'text-[#6e7681]',
-  };
-  const statusLabel: Record<string, string> = {
-    open: 'Abierta',
-    in_process: 'En proceso',
-    finished: 'Finalizada',
-    cancelled: 'Cancelada',
+    ABIERTA: 'text-emerald-400',
+    EN_PROCESO: 'text-yellow-400',
+    FINALIZADA: 'text-blue-400',
+    CANCELADA: 'text-[#6e7681]',
   };
 
   return (
@@ -46,10 +50,10 @@ export default function DashboardPage({ userRole, userName, onNavigate, orders, 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Órdenes abiertas', value: openOrders.length, sub: 'requieren atención', accent: '#f97316', icon: '⊞', page: 'orders' },
-          { label: 'Clientes registrados', value: customers.length, sub: `${customers.reduce((s,c)=>s+c.motorcycles.length,0)} motocicletas`, accent: '#34d399', icon: '◎', page: 'customers' },
-          { label: 'Catálogo activo', value: catalog.filter(i => i.active).length, sub: 'servicios y repuestos', accent: '#60a5fa', icon: '≡', page: 'catalog' },
-          { label: 'Ingresos finalizados', value: fmt(totalRevenue), sub: `${orders.filter(o=>o.status==='finished').length} órdenes`, accent: '#a78bfa', icon: '₡', page: 'orders' },
-        ].map(kpi => (
+          { label: 'Clientes registrados', value: customers.filter(c => c.activo).length, sub: 'clientes activos', accent: '#34d399', icon: '◎', page: 'customers' },
+          { label: 'Catálogo activo', value: catalog.length, sub: 'servicios y repuestos', accent: '#60a5fa', icon: '≡', page: 'catalog' },
+          { label: 'Ingresos finalizados', value: formatCOP(totalRevenue), sub: `${finishedOrders.length} órdenes`, accent: '#a78bfa', icon: '₡', page: 'orders' },
+        ].filter(kpi => canAccessPage(userRole, kpi.page)).map(kpi => (
           <button
             key={kpi.label}
             onClick={() => onNavigate(kpi.page)}
@@ -97,12 +101,12 @@ export default function DashboardPage({ userRole, userName, onNavigate, orders, 
               <div key={o.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[#1c2128]/60 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-[#f97316]">{o.orderNumber}</span>
-                    <span className={`text-xs font-medium ${statusColor[o.status]}`}>{statusLabel[o.status]}</span>
+                    <span className="font-mono text-xs text-[#f97316]">{o.numero}</span>
+                    <span className={`text-xs font-medium ${statusColor[o.estado]}`}>{STATUS_LABELS[o.estado]}</span>
                   </div>
-                  <div className="text-xs text-[#6e7681] truncate">{o.customerName} · {o.motorcyclePlate}</div>
+                  <div className="text-xs text-[#6e7681] truncate">{o.cliente?.nombreRazonSocial} · {o.motocicleta?.placa}</div>
                 </div>
-                <span className="font-mono text-xs text-[#8b949e] shrink-0">{fmt(o.total)}</span>
+                <span className="font-mono text-xs text-[#8b949e] shrink-0">{formatCOP(o.total)}</span>
               </div>
             ))}
           </div>
@@ -113,11 +117,13 @@ export default function DashboardPage({ userRole, userName, onNavigate, orders, 
           <h2 className="text-sm font-semibold text-[#8b949e] uppercase tracking-wider mb-3">Acciones rápidas</h2>
           <div className="flex flex-col gap-2">
             {[
-              { label: 'Nueva orden de servicio', desc: 'Registrar atención a un vehículo', page: 'orders', color: '#f97316' },
+              canCreateOrders(userRole)
+                ? { label: 'Nueva orden de servicio', desc: 'Registrar atención a un vehículo', page: 'orders', color: '#f97316' }
+                : { label: 'Trabajar órdenes', desc: 'Actualizar estado, servicios y repuestos', page: 'orders', color: '#f97316' },
               { label: 'Registrar cliente', desc: 'Agregar cliente y motocicleta', page: 'customers', color: '#34d399' },
               { label: 'Actualizar catálogo', desc: 'Servicios y repuestos', page: 'catalog', color: '#60a5fa' },
-              ...(userRole === 'admin' ? [{ label: 'Gestionar usuarios', desc: 'Control de acceso y roles', page: 'users', color: '#a78bfa' }] : []),
-            ].map(action => (
+              { label: 'Gestionar usuarios', desc: 'Control de acceso y roles', page: 'users', color: '#a78bfa' },
+            ].filter(action => canAccessPage(userRole, action.page)).map(action => (
               <button
                 key={action.page + action.label}
                 onClick={() => onNavigate(action.page)}

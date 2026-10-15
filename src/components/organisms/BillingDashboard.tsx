@@ -69,15 +69,6 @@ export default function BillingDashboard({ invoices, orders, creditNotes }: Prop
     .reduce((s, i) => s + (i.total - i.creditNotesTotal - i.paidAmount), 0);
 
   // Top services
-  const serviceCount: Record<string, { name: string; qty: number; total: number }> = {};
-  periodOrders.forEach(o => {
-    o.items.forEach(item => {
-      if (!serviceCount[item.code]) serviceCount[item.code] = { name: item.name, qty: 0, total: 0 };
-      serviceCount[item.code].qty += item.quantity;
-      serviceCount[item.code].total += item.subtotal;
-    });
-  });
-  const topServices = Object.values(serviceCount).sort((a, b) => b.qty - a.qty).slice(0, 5);
   const topServicesByType = (type: 'service' | 'part') =>
     periodOrders.flatMap(o => o.items.filter(i => i.type === type))
       .reduce((acc, item) => {
@@ -233,7 +224,7 @@ function TopList({ title, items, color, emptyMsg }: { title: string; items: { na
         <div className="text-sm text-[#6e7681] py-4 text-center">{emptyMsg}</div>
       ) : (
         <div className="flex flex-col gap-3">
-          {items.map((item, i) => (
+          {items.map(item => (
             <div key={item.name}>
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-[#e6edf3] font-medium">{item.name}</span>

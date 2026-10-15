@@ -178,7 +178,6 @@ export default function InvoiceManager({ invoices, setInvoices, orders, config, 
     if (!registerPaymentInv) return;
     const amount = Number(paymentAmount);
     if (!amount || amount <= 0) return;
-    const balance = registerPaymentInv.total - registerPaymentInv.creditNotesTotal - registerPaymentInv.paidAmount;
     const newPaid = Math.min(registerPaymentInv.paidAmount + amount, registerPaymentInv.total - registerPaymentInv.creditNotesTotal);
     const newStatus = newPaid >= registerPaymentInv.total - registerPaymentInv.creditNotesTotal ? 'paid' : 'partial';
     setInvoices(prev => prev.map(i => i.id === registerPaymentInv.id ? { ...i, paidAmount: newPaid, paymentStatus: newStatus } : i));

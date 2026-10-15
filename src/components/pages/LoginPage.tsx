@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import { apiRequest } from '../../lib/api';
+import { supabase } from '../../lib/supabase';
+import { roleFromProfile } from '../../lib/roles';
+import type { AuthUser, BackendProfile } from '../../lib/types';
 
 interface LoginPageProps {
-  onLogin: (email: string, role: 'admin' | 'operator') => void;
+  onLogin: (user: AuthUser, token: string) => void;
 }
-
-const DEMO_USERS = [
-  { email: 'admin@factux.co', password: 'admin123', role: 'admin' as const },
-  { email: 'pedro.mecanico@factux.co', password: 'operador123', role: 'operator' as const },
-];
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('');
@@ -17,20 +16,45 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     if (!email || !password) { setError('Ingresa tu correo y contraseña.'); return; }
     setLoading(true);
-    setTimeout(() => {
-      const user = DEMO_USERS.find(u => u.email === email && u.password === password);
-      if (user) {
-        onLogin(user.email, user.role);
-      } else {
-        setError('Las credenciales ingresadas son incorrectas.');
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError || !data.session || !data.user.email) {
+        // HU-12: mensaje genérico; no revela si el correo existe.
+        setError(authError?.code === 'user_banned'
+          ? 'Tu cuenta está desactivada. Contacta al administrador.'
+          : 'Correo o contraseña incorrectos.');
+        return;
       }
+
+      const profile = await apiRequest<{ data: BackendProfile }>('/auth/me', {
+        token: data.session.access_token,
+      });
+
+      onLogin(
+        {
+          id: profile.data.id,
+          email: data.user.email,
+          role: roleFromProfile(profile.data.rol),
+        },
+        data.session.access_token,
+      );
+    } catch (err) {
+      // Sin profile activo no debe quedar una sesión de Supabase abierta.
+      await supabase.auth.signOut();
+      setError(err instanceof Error ? err.message : 'No fue posible iniciar sesión.');
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   }
 
   return (
@@ -109,21 +133,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </Button>
           </form>
 
-          {/* Demo credentials */}
           <div className="mt-8 p-4 bg-[#161b22] border border-[#30363d] rounded-[6px]">
-            <p className="text-xs text-[#6e7681] font-semibold mb-2 uppercase tracking-wider">Demo — credenciales de prueba</p>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="font-mono text-[#8b949e]">admin@factux.co</span>
-                <span className="font-mono text-[#6e7681]">admin123</span>
-                <span className="text-[#f97316]">Administrador</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="font-mono text-[#8b949e]">pedro.mecanico@factux.co</span>
-                <span className="font-mono text-[#6e7681]">operador123</span>
-                <span className="text-sky-400">Operador</span>
-              </div>
-            </div>
+            <p className="text-xs text-[#6e7681] font-semibold mb-2 uppercase tracking-wider">Acceso conectado</p>
+            <p className="text-xs text-[#8b949e] leading-relaxed">
+              Usa un usuario real de Supabase Auth. El backend validara el JWT y consultara el perfil activo en FactuX.
+            </p>
           </div>
         </div>
       </div>
