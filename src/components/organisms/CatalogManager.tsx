@@ -42,6 +42,11 @@ const ivaOptions = [
   { value: 'EXCLUIDO', label: 'Excluido' },
 ];
 
+const taxRateOptions = [
+  { value: '19', label: '19% (general)' },
+  { value: '5', label: '5% (diferencial)' },
+];
+
 type CatalogForm = {
   code: string;
   name: string;
@@ -140,8 +145,8 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
     if (!form.name.trim()) e.name = 'El nombre es obligatorio';
     if (!form.type) e.type = 'El tipo es obligatorio';
     if (!form.price || form.price <= 0) e.price = 'El precio debe ser mayor a 0';
-    if (form.ivaTreatment === 'GRAVADO' && (form.taxRate <= 0 || form.taxRate > 100))
-      e.taxRate = 'La tarifa debe estar entre 0 y 100';
+    if (form.ivaTreatment === 'GRAVADO' && ![19, 5].includes(form.taxRate))
+      e.taxRate = 'Un ítem gravado solo admite IVA 19% o 5%';
     if (!editing && items.find(i => i.code.toLowerCase() === form.code.toLowerCase()))
       e.code = 'El código ya existe en el catálogo';
     return e;
@@ -329,12 +334,13 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
               label="Tratamiento IVA *"
               options={ivaOptions}
               value={form.ivaTreatment}
-              onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva }))}
+              onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva, taxRate: [19, 5].includes(f.taxRate) ? f.taxRate : 19 }))}
             />
-            <Input
+            {/* Tarifas vigentes: 19% general (E.T. art. 468) y 5% diferencial; exento/excluido = 0% */}
+            <Select
               label="Tarifa IVA (%)"
-              type="number"
-              value={form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0}
+              options={form.ivaTreatment === 'GRAVADO' ? taxRateOptions : [{ value: '0', label: '0%' }]}
+              value={String(form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0)}
               onChange={e => setForm(f => ({ ...f, taxRate: Number(e.target.value) }))}
               error={errors.taxRate}
               disabled={form.ivaTreatment !== 'GRAVADO'}

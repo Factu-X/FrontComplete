@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
+import MotorcycleHistory from './MotorcycleHistory';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
 import {
@@ -35,6 +36,7 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
   const [catalogSearch, setCatalogSearch] = useState('');
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const editable = !readOnly && !!order && isOrderEditable(order.estado);
 
@@ -109,12 +111,32 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
 
   return (
     <div className="flex flex-col gap-5">
+      {historyOpen && order.motocicleta && order.cliente && (
+        <MotorcycleHistory
+          motorcycle={{
+            id: order.motocicletaId,
+            plate: order.motocicleta.placa,
+            brand: order.motocicleta.marca,
+            model: order.motocicleta.modelo,
+            year: order.motocicleta.anio,
+          }}
+          customerName={order.cliente.nombreRazonSocial}
+          session={session}
+          addToast={addToast}
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
         {!compact && order.cliente && order.motocicleta && (
           <>
             <div><span className="text-[#6e7681]">Cliente:</span> <span className="ml-1 font-medium text-[#e6edf3]">{order.cliente.nombreRazonSocial}</span></div>
             <div><span className="text-[#6e7681]">Identificación:</span> <span className="ml-1 font-mono text-xs">{order.cliente.numeroIdentificacion}</span></div>
             <div><span className="text-[#6e7681]">Motocicleta:</span> <span className="ml-1 font-mono text-xs text-[#f97316]">{order.motocicleta.placa}</span> <span className="text-[#8b949e]">{order.motocicleta.marca} {order.motocicleta.modelo} {order.motocicleta.anio ?? ''}</span></div>
+            <div>
+              {/* HU-05: el operario abre el historial desde la orden que atiende */}
+              <Button size="sm" variant="ghost" onClick={() => setHistoryOpen(true)}>Historial de la moto</Button>
+            </div>
           </>
         )}
         <div><span className="text-[#6e7681]">Fecha:</span> <span className="ml-1 font-mono text-xs">{new Date(order.fechaIngreso).toLocaleString('es-CO')}</span></div>

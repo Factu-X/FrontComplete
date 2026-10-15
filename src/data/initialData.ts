@@ -1,4 +1,4 @@
-import { Customer, CatalogItem, Order, Reminder, CompanyConfig, Invoice, CreditNote, UsabilitySession } from '../types';
+import { Customer, CatalogItem, Order, Reminder, Invoice, CreditNote, UsabilitySession } from '../types';
 
 export const initialCustomers: Customer[] = [
   {
@@ -90,18 +90,6 @@ export const initialReminders: Reminder[] = [
     createdAt: '2026-09-18T15:00:00', notificationSent: true,
   },
 ];
-
-export const initialCompanyConfig: CompanyConfig = {
-  nit: '901234567', verificationDigit: '8',
-  businessName: 'Taller Moto Express S.A.S.', tradeName: 'Moto Express',
-  address: 'Cra 45 # 80-23, Local 2', city: 'Medellín, Antioquia',
-  phone: '3004567890', email: 'facturacion@motoexpress.co',
-  invoicePrefix: 'FE', resolutionNumber: '18764000000123', resolutionDate: '2026-01-15',
-  rangeFrom: 1, rangeTo: 5000, validFrom: '2026-01-15', validTo: '2027-01-15',
-  currentNumber: 3,
-  dianEnv: 'testing', dianClientId: 'demo-client-id', dianClientSecret: 'demo-secret',
-  hasCertificate: false, certificateName: '',
-};
 
 export const initialInvoices: Invoice[] = [
   {

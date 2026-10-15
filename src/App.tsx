@@ -15,14 +15,15 @@ import UserManager from './components/organisms/UserManager';
 import UsabilityTest from './components/organisms/UsabilityTest';
 import Sidebar, { Page } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
+import DemoNotice from './components/molecules/DemoNotice';
 import { apiRequest } from './lib/api';
 import { supabase } from './lib/supabase';
 import { canAccessPage, ROLE_LABELS, roleFromProfile } from './lib/roles';
-import type { AuthUser, BackendProfile } from './lib/types';
-import { Customer, Order, Reminder, CompanyConfig, Invoice, CreditNote, UsabilitySession } from './types';
+import type { AuthUser, BackendConfiguracion, BackendProfile } from './lib/types';
+import { Customer, Order, Reminder, Invoice, CreditNote, UsabilitySession } from './types';
 import {
   initialCustomers, initialOrders,
-  initialReminders, initialCompanyConfig, initialInvoices,
+  initialReminders, initialInvoices,
   initialCreditNotes, initialUsabilitySessions,
 } from './data/initialData';
 
@@ -34,12 +35,13 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // shortcut: recordatorios, facturación DIAN, notas crédito, cartera y usabilidad siguen con datos de prueba;
-  // conectarlos cuando el backend exponga esos módulos. Clientes, catálogo, órdenes y usuarios ya usan la API.
+  // shortcut: recordatorios (HU-11), notas crédito (HU-08), cartera (HU-10), dashboard de facturación (HU-09)
+  // y usabilidad (HU-14) siguen con datos de prueba y se marcan con DemoNotice; conectarlos cuando exista su API.
+  // Clientes, catálogo, órdenes, usuarios, configuración y facturación ya usan la API.
   const [mockCustomers] = useState<Customer[]>(initialCustomers);
   const [mockOrders] = useState<Order[]>(initialOrders);
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
-  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(initialCompanyConfig);
+  const [configComplete, setConfigComplete] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>(initialCreditNotes);
   const [usabilitySessions, setUsabilitySessions] = useState<UsabilitySession[]>(initialUsabilitySessions);
@@ -48,6 +50,14 @@ export default function App() {
     const id = Date.now();
     setToasts(prev => [...prev, { ...t, id }]);
   }, []);
+
+  // El aviso del menú refleja la configuración real (HU-13); el operario no la consulta.
+  useEffect(() => {
+    if (!auth || auth.user.role === 'operator') return;
+    apiRequest<{ data: BackendConfiguracion }>('/configuracion', { token: auth.token })
+      .then(response => setConfigComplete(response.data.estado.puedeEmitir))
+      .catch(() => setConfigComplete(false));
+  }, [auth?.token, auth?.user.role]);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -124,12 +134,6 @@ export default function App() {
 
   const userName = auth.user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
   const pendingReminderCount = reminders.filter(r => r.status === 'pending').length;
-  const pendingReceivables = invoices.filter(i => i.status !== 'cancelled' && i.paymentStatus !== 'paid').length;
-  const configComplete = !!(
-    companyConfig.nit && companyConfig.businessName && companyConfig.resolutionNumber &&
-    companyConfig.invoicePrefix && companyConfig.rangeFrom && companyConfig.rangeTo &&
-    companyConfig.dianClientId && companyConfig.dianClientSecret
-  );
 
   const session = { token: auth.token };
   const role = auth.user.role;
@@ -145,7 +149,6 @@ export default function App() {
         onLogout={handleLogout}
         reminderCount={pendingReminderCount}
         configComplete={configComplete}
-        pendingReceivables={pendingReceivables}
       />
 
       <main className="flex-1 overflow-auto">
@@ -162,61 +165,70 @@ export default function App() {
           {canView('catalog') && <CatalogManager session={session} userRole={role} addToast={addToast} />}
           {canView('customers') && <CustomerManager session={session} addToast={addToast} />}
           {canView('reminders') && (
-            <RemindersManager
-              reminders={reminders}
-              setReminders={setReminders}
-              customers={mockCustomers}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-11" />
+              <RemindersManager
+                reminders={reminders}
+                setReminders={setReminders}
+                customers={mockCustomers}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('invoices') && (
-            <InvoiceManager
-              invoices={invoices}
-              setInvoices={setInvoices}
-              orders={mockOrders}
-              config={companyConfig}
-              setConfig={setCompanyConfig}
-              addToast={addToast}
-            />
+            <InvoiceManager session={session} addToast={addToast} />
           )}
           {canView('credit-notes') && (
-            <CreditNoteManager
-              creditNotes={creditNotes}
-              setCreditNotes={setCreditNotes}
-              invoices={invoices}
-              setInvoices={setInvoices}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-08" />
+              <CreditNoteManager
+                creditNotes={creditNotes}
+                setCreditNotes={setCreditNotes}
+                invoices={invoices}
+                setInvoices={setInvoices}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('receivables') && (
-            <AccountsReceivable
-              invoices={invoices}
-              setInvoices={setInvoices}
-            />
+            <>
+              <DemoNotice hu="HU-10" />
+              <AccountsReceivable
+                invoices={invoices}
+                setInvoices={setInvoices}
+              />
+            </>
           )}
           {canView('billing-dashboard') && (
-            <BillingDashboard
-              invoices={invoices}
-              orders={mockOrders}
-              creditNotes={creditNotes}
-            />
+            <>
+              <DemoNotice hu="HU-09" />
+              <BillingDashboard
+                invoices={invoices}
+                orders={mockOrders}
+                creditNotes={creditNotes}
+              />
+            </>
           )}
           {canView('settings') && (
             <CompanyConfigPage
-              config={companyConfig}
-              setConfig={setCompanyConfig}
+              session={session}
+              userRole={role}
               addToast={addToast}
+              onChanged={config => setConfigComplete(config.estado.puedeEmitir)}
             />
           )}
           {canView('users') && (
             <UserManager addToast={addToast} session={session} currentUserId={auth.user.id} />
           )}
           {canView('usability') && (
-            <UsabilityTest
-              sessions={usabilitySessions}
-              setSessions={setUsabilitySessions}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-14" />
+              <UsabilityTest
+                sessions={usabilitySessions}
+                setSessions={setUsabilitySessions}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('help') && (
             <HelpPage />

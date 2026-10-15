@@ -58,3 +58,22 @@ export type ApiListResponse<T> = {
 export type ApiEntityResponse<T> = {
   data: T;
 };
+
+// Descarga un archivo protegido (p. ej. el XML de una factura) con el token de la sesión.
+export async function apiDownload(path: string, session: ApiSession, filename: string) {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(body?.error?.message ?? 'No fue posible descargar el archivo', response.status);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
