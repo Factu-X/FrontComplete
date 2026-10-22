@@ -38,12 +38,20 @@ export const setUnauthorizedHandler = (handler: (() => void) | null) => {
   onUnauthorized = handler;
 };
 
+// Solo rutas relativas de la API: una ruta armada con datos externos nunca lleva el token a otro host.
+const apiUrl = (path: string) => {
+  if (!/^\/[\w\-/?=&.%]*$/.test(path) || path.startsWith('//') || path.includes('..')) {
+    throw new Error(`Ruta de API inválida: ${path}`);
+  }
+  return `${API_URL}${path}`;
+};
+
 export async function apiRequest<T>(
   path: string,
   session: ApiSession,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -65,7 +73,7 @@ export async function apiRequest<T>(
 
 // Trae un archivo protegido (PDF, XML) con el token, para mostrarlo o descargarlo.
 export async function apiBlob(path: string, session: ApiSession): Promise<Blob> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     headers: { Authorization: `Bearer ${session.token}` },
   });
 

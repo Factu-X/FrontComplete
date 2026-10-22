@@ -53,7 +53,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [session.token]);
 
   const pendingOrders = ordersPendingInvoice(ordenes, facturas);

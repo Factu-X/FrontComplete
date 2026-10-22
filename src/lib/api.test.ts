@@ -76,4 +76,13 @@ describe('apiRequest', () => {
       status: 500,
     });
   });
+
+  it('only calls relative API paths, never another host', async () => {
+    mockFetch(200, JSON.stringify({ data: [] }));
+
+    await expect(apiRequest('//evil.example/x', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('https://evil.example', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('/facturas/../usuarios', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('/reportes/facturacion?desde=2026-10-01&hasta=2026-10-31', { token: 'jwt' })).resolves.toEqual({ data: [] });
+  });
 });
