@@ -127,7 +127,7 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
           onClose={() => setHistoryOpen(false)}
         />
       )}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
         {!compact && order.cliente && order.motocicleta && (
           <>
             <div><span className="text-[#6e7681]">Cliente:</span> <span className="ml-1 font-medium text-[#e6edf3]">{order.cliente.nombreRazonSocial}</span></div>
@@ -214,9 +214,9 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
               <tr className="bg-[#1c2128] border-b border-[#30363d]">
                 <th className="px-3 py-2 text-left text-[#6e7681]">Elemento</th>
                 <th className="px-3 py-2 text-center text-[#6e7681]">Cant.</th>
-                <th className="px-3 py-2 text-right text-[#6e7681]">P. Unit.</th>
-                <th className="px-3 py-2 text-right text-[#6e7681]">Subtotal</th>
-                <th className="px-3 py-2 text-right text-[#6e7681]">IVA</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-right text-[#6e7681]">P. Unit.</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-right text-[#6e7681]">Subtotal</th>
+                <th className="hidden sm:table-cell px-3 py-2 text-right text-[#6e7681]">IVA</th>
                 <th className="px-3 py-2 text-right text-[#6e7681]">Total</th>
                 {editable && <th />}
               </tr>
@@ -245,9 +245,9 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
                       </div>
                     ) : toNumber(item.cantidad)}
                   </td>
-                  <td className="px-3 py-2 text-right font-mono text-[#8b949e]">{formatCOP(item.precioUnitario)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-[#e6edf3]">{formatCOP(item.subtotal)}</td>
-                  <td className="px-3 py-2 text-right font-mono text-[#8b949e]">{formatCOP(item.impuesto)}</td>
+                  <td className="hidden sm:table-cell px-3 py-2 text-right font-mono text-[#8b949e]">{formatCOP(item.precioUnitario)}</td>
+                  <td className="hidden sm:table-cell px-3 py-2 text-right font-mono text-[#e6edf3]">{formatCOP(item.subtotal)}</td>
+                  <td className="hidden sm:table-cell px-3 py-2 text-right font-mono text-[#8b949e]">{formatCOP(item.impuesto)}</td>
                   <td className="px-3 py-2 text-right font-mono font-semibold text-[#e6edf3]">{formatCOP(item.total)}</td>
                   {editable && (
                     <td className="px-2 text-right">

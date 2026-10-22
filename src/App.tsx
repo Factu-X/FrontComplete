@@ -13,10 +13,10 @@ import BillingDashboard from './components/organisms/BillingDashboard';
 import CompanyConfigPage from './components/organisms/CompanyConfig';
 import UserManager from './components/organisms/UserManager';
 import UsabilityTest from './components/organisms/UsabilityTest';
-import Sidebar, { Page } from './components/organisms/Sidebar';
+import Sidebar, { Page, PAGE_LABELS } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
 import DemoNotice from './components/molecules/DemoNotice';
-import { apiRequest } from './lib/api';
+import { apiRequest, setUnauthorizedHandler } from './lib/api';
 import { supabase } from './lib/supabase';
 import { canAccessPage, ROLE_LABELS, roleFromProfile } from './lib/roles';
 import type { AuthUser, BackendConfiguracion, BackendProfile } from './lib/types';
@@ -41,6 +41,7 @@ export default function App() {
   const [mockCustomers] = useState<Customer[]>(initialCustomers);
   const [mockOrders] = useState<Order[]>(initialOrders);
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [configComplete, setConfigComplete] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>(initialCreditNotes);
@@ -50,6 +51,19 @@ export default function App() {
     const id = Date.now();
     setToasts(prev => [...prev, { ...t, id }]);
   }, []);
+
+  // Si el backend rechaza el token (vencido o revocado) se cierra la sesión una sola vez.
+  useEffect(() => {
+    if (!auth) return;
+    let handled = false;
+    setUnauthorizedHandler(() => {
+      if (handled) return;
+      handled = true;
+      addToast({ message: 'Tu sesión venció. Inicia sesión de nuevo.', type: 'warning' });
+      supabase.auth.signOut();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [auth?.user.id, addToast]);
 
   // El aviso del menú refleja la configuración real (HU-13); el operario no la consulta.
   useEffect(() => {
@@ -72,7 +86,7 @@ export default function App() {
       if (!active) return;
       setAuth({
         token,
-        user: { id: profile.data.id, email, role: roleFromProfile(profile.data.rol) },
+        user: { id: profile.data.id, email, name: profile.data.nombre, role: roleFromProfile(profile.data.rol) },
       });
     }
 
@@ -117,7 +131,7 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center text-[#8b949e] text-sm">
+      <div className="min-h-dvh bg-[#0d1117] flex items-center justify-center text-[#8b949e] text-sm">
         Validando sesión...
       </div>
     );
@@ -132,7 +146,7 @@ export default function App() {
     );
   }
 
-  const userName = auth.user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const userName = auth.user.name;
   const pendingReminderCount = reminders.filter(r => r.status === 'pending').length;
 
   const session = { token: auth.token };
@@ -140,7 +154,7 @@ export default function App() {
   const canView = (p: Page) => page === p && canAccessPage(role, p);
 
   return (
-    <div className="flex min-h-screen bg-[#0d1117]">
+    <div className="flex min-h-dvh bg-[#0d1117]">
       <Sidebar
         current={page}
         onNavigate={setPage}
@@ -149,10 +163,23 @@ export default function App() {
         onLogout={handleLogout}
         reminderCount={pendingReminderCount}
         configComplete={configComplete}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
       />
 
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-6 py-7">
+      <div className="flex-1 min-w-0 flex flex-col">
+      <header className="lg:hidden sticky top-0 z-20 flex items-center gap-3 h-14 px-4 bg-[#161b22] border-b border-[#30363d]">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Abrir menú"
+          className="-ml-1 p-1.5 rounded-[6px] text-[#e6edf3] text-xl leading-none hover:bg-[#21262d]"
+        >☰</button>
+        <div className="w-7 h-7 bg-[#f97316] rounded flex items-center justify-center font-bold text-[#0d1117] text-xs shrink-0">FX</div>
+        <span className="font-semibold text-[#e6edf3] truncate">{PAGE_LABELS[page]}</span>
+      </header>
+
+      <main className="flex-1 min-w-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
           {canView('dashboard') && (
             <DashboardPage
               userRole={role}
@@ -242,6 +269,7 @@ export default function App() {
           )}
         </div>
       </main>
+      </div>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>

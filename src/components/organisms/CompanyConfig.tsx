@@ -5,6 +5,7 @@ import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiSession } from '../../lib/api';
+import { calcularDigitoVerificacion } from '../../lib/nit';
 import { canEditSettings } from '../../lib/roles';
 import type { BackendConfiguracion, BackendEmpresa, BackendNumeracion, UserRole } from '../../lib/types';
 
@@ -173,7 +174,7 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Configuración de Empresa y DIAN</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">
@@ -202,12 +203,20 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
         </div>
       )}
 
-      <div className="flex border-b border-[#30363d]">
+      {estado.advertencias.length > 0 && (
+        <div className="px-4 py-3 bg-blue-500/10 border border-blue-500/25 rounded-[6px] flex flex-col gap-1">
+          {estado.advertencias.map(aviso => (
+            <div key={aviso} className="text-sm text-blue-300">ⓘ {aviso}</div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex max-w-full overflow-x-auto border-b border-[#30363d]">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm border-b-2 transition-colors ${
+            className={`flex items-center gap-2 whitespace-nowrap px-5 py-2.5 text-sm border-b-2 transition-colors ${
               tab === t.id ? 'border-[#f97316] text-[#f97316] font-semibold' : 'border-transparent text-[#6e7681] hover:text-[#e6edf3]'
             }`}
           >
@@ -216,12 +225,18 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
         ))}
       </div>
 
-      <div className="bg-[#161b22] border border-[#30363d] rounded-[8px] p-6">
+      <div className="bg-[#161b22] border border-[#30363d] rounded-[8px] p-4 sm:p-6">
         {tab === 'empresa' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className={sectionTitle}>Identificación fiscal</div>
             <div className="flex gap-2">
-              <div className="flex-1"><Input label="NIT (sin DV) *" placeholder="901234567" {...fieldE('nit')} /></div>
+              <div className="flex-1"><Input
+                label="NIT (sin DV) *"
+                placeholder="901234567"
+                {...fieldE('nit')}
+                // El DV se calcula al escribir el NIT; el backend lo vuelve a validar.
+                onChange={e => setEmpresa(f => ({ ...f, nit: e.target.value, digitoVerificacion: calcularDigitoVerificacion(e.target.value) ?? '' }))}
+              /></div>
               <div className="w-20"><Input label="DV *" maxLength={1} placeholder="8" {...fieldE('digitoVerificacion')} /></div>
             </div>
             <Input label="Razón social *" {...fieldE('razonSocial')} />

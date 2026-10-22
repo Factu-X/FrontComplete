@@ -23,6 +23,21 @@ export class ApiError extends Error {
   }
 }
 
+// En errores de validación el backend manda el motivo en details; se muestra el primero.
+const errorMessage = (body: ApiErrorBody | null) => {
+  const message = body?.error?.message ?? 'No fue posible completar la solicitud';
+  const details = body?.error?.details;
+  const first = Array.isArray(details) ? (details[0] as { message?: unknown } | undefined) : undefined;
+  return typeof first?.message === 'string' ? `${message}: ${first.message}` : message;
+};
+
+// La app registra aquí qué hacer cuando el backend dice que la sesión ya no es válida.
+let onUnauthorized: (() => void) | null = null;
+
+export const setUnauthorizedHandler = (handler: (() => void) | null) => {
+  onUnauthorized = handler;
+};
+
 export async function apiRequest<T>(
   path: string,
   session: ApiSession,
@@ -41,15 +56,37 @@ export async function apiRequest<T>(
   const body = text ? (JSON.parse(text) as ApiErrorBody & T) : null;
 
   if (!response.ok) {
-    throw new ApiError(
-      body?.error?.message ?? 'No fue posible completar la solicitud',
-      response.status,
-      body?.error?.code,
-    );
+    if (response.status === 401) onUnauthorized?.();
+    throw new ApiError(errorMessage(body), response.status, body?.error?.code);
   }
 
   return body as T;
 }
+
+// Trae un archivo protegido (PDF, XML) con el token, para mostrarlo o descargarlo.
+export async function apiBlob(path: string, session: ApiSession): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) onUnauthorized?.();
+    const text = await response.text();
+    const body = text ? (JSON.parse(text) as ApiErrorBody) : null;
+    throw new ApiError(body ? errorMessage(body) : 'No fue posible obtener el archivo', response.status, body?.error?.code);
+  }
+
+  return response.blob();
+}
+
+export const saveBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 export type ApiListResponse<T> = {
   data: T[];
@@ -59,21 +96,5 @@ export type ApiEntityResponse<T> = {
   data: T;
 };
 
-// Descarga un archivo protegido (p. ej. el XML de una factura) con el token de la sesión.
-export async function apiDownload(path: string, session: ApiSession, filename: string) {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { Authorization: `Bearer ${session.token}` },
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
-    throw new ApiError(body?.error?.message ?? 'No fue posible descargar el archivo', response.status);
-  }
-
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+export const apiDownload = async (path: string, session: ApiSession, fileName: string) =>
+  saveBlob(await apiBlob(path, session), fileName);

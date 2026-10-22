@@ -44,6 +44,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {
           id: profile.data.id,
           email: data.user.email,
+          name: profile.data.nombre,
           role: roleFromProfile(profile.data.rol),
         },
         data.session.access_token,
@@ -58,7 +59,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] flex">
+    <div className="min-h-dvh bg-[#0d1117] flex">
       {/* Left panel — decorative */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-[#161b22] border-r border-[#30363d] p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 60px, #f97316 60px, #f97316 61px), repeating-linear-gradient(90deg, transparent, transparent 60px, #f97316 60px, #f97316 61px)' }} />
@@ -94,7 +95,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8">
+      <div className="flex-1 flex flex-col items-center justify-center p-5 sm:p-8">
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <div className="w-8 h-8 bg-[#f97316] rounded flex items-center justify-center font-bold text-[#0d1117] text-sm">FX</div>

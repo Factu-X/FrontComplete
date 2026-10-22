@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'billing' | 'operator';
 export type AuthUser = {
   id: string;
   email: string;
+  name: string;
   role: UserRole;
 };
 
@@ -176,5 +177,6 @@ export type BackendConfiguracion = {
     faltantesEmision: string[];
     puedeTransmitir: boolean;
     faltantesTransmision: string[];
+    advertencias: string[];
   };
 };

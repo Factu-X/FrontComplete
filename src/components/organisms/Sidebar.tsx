@@ -30,6 +30,8 @@ const navItems: NavItem[] = [
   { id: 'help', label: 'Ayuda', icon: '?', group: 'support' },
 ];
 
+export const PAGE_LABELS = Object.fromEntries(navItems.map(item => [item.id, item.label])) as Record<Page, string>;
+
 const groupLabels: Record<string, string> = {
   main: 'Operación',
   ops: 'Seguimiento',
@@ -47,17 +49,26 @@ interface SidebarProps {
   reminderCount?: number;
   configComplete?: boolean;
   pendingReceivables?: number;
+  // En pantallas angostas el menú es un cajón que se abre desde la barra superior.
+  open: boolean;
+  onClose: () => void;
 }
 
 export default function Sidebar({
   current, onNavigate, userRole, userName, onLogout,
-  orderCount = 0, reminderCount = 0, configComplete = true, pendingReceivables = 0,
+  orderCount = 0, reminderCount = 0, configComplete = true, pendingReceivables = 0, open, onClose,
 }: SidebarProps) {
   const visibleItems = navItems.filter(i => canAccessPage(userRole, i.id));
   const groups = ['main', 'ops', 'admin', 'support'];
 
   return (
-    <aside className="w-60 shrink-0 bg-[#161b22] border-r border-[#30363d] flex flex-col h-screen sticky top-0">
+    <>
+    {open && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={onClose} aria-hidden="true" />}
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 w-64 max-w-[85vw] transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:w-60 lg:max-w-none lg:translate-x-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      } shrink-0 bg-[#161b22] border-r border-[#30363d] flex flex-col h-dvh`}
+    >
       <div className="px-5 py-5 border-b border-[#30363d]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-[#f97316] rounded flex items-center justify-center font-bold text-[#0d1117] text-sm">FX</div>
@@ -65,6 +76,7 @@ export default function Sidebar({
             <div className="font-bold text-[#e6edf3] text-base leading-none">FactuX</div>
             <div className="text-[10px] text-[#6e7681] font-mono uppercase tracking-widest mt-0.5">Taller Motos</div>
           </div>
+          <button onClick={onClose} aria-label="Cerrar menú" className="ml-auto lg:hidden text-[#6e7681] hover:text-[#e6edf3] text-lg leading-none p-1">✕</button>
         </div>
       </div>
 
@@ -86,7 +98,7 @@ export default function Sidebar({
                 return (
                   <button
                     key={item.id}
-                    onClick={() => onNavigate(item.id)}
+                    onClick={() => { onNavigate(item.id); onClose(); }}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[6px] text-sm transition-all text-left mb-0.5 ${
                       active
                         ? 'bg-[#f97316]/15 text-[#f97316] font-semibold'
@@ -127,5 +139,6 @@ export default function Sidebar({
         </div>
       </div>
     </aside>
+    </>
   );
 }
