@@ -36,7 +36,7 @@ export default function CreditNoteManager({ session, addToast }: Props) {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [session.token]);
 
   const q = search.trim().toLowerCase();
@@ -100,7 +100,7 @@ export default function CreditNoteManager({ session, addToast }: Props) {
             session={session}
             addToast={addToast}
             onCancel={() => setFormOpen(false)}
-            onCreated={nota => { setFormOpen(false); setDetailId(nota.id); load(); }}
+            onCreated={nota => { setFormOpen(false); setDetailId(nota.id); void load(); }}
           />
         )}
       </Modal>

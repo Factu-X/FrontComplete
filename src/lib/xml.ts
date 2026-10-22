@@ -6,7 +6,8 @@ const NS = {
   cac: 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
   sts: 'dian:gov:co:facturaelectronica:Structures-2-1',
   ds: 'http://www.w3.org/2000/09/xmldsig#',
-  xades: 'http://uri.etsi.org/01903/v1.3.2#',
+  // Identificador del namespace XAdES (ETSI), no una URL que se consulte.
+  xades: 'http://uri.etsi.org/01903/v1.3.2#', // NOSONAR
 };
 
 const escapeText = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -83,7 +84,7 @@ export const summarizeInvoiceXml = (xml: string): XmlSummary => {
 
 // Parte una línea del XML formateado en marcas y texto, para colorearla sin usar HTML crudo.
 export const tokenizeXmlLine = (line: string) =>
-  line.split(/(<\/?[\w:.-]+|\/?>|[\w:.-]+="[^"]*")/).filter(Boolean).map(part => ({
+  line.split(/(<\/?[\w:.-]+|\/?>|(?<=\s)[\w:.-]+="[^"]*")/).filter(Boolean).map(part => ({
     text: part,
     kind: part.startsWith('<') || part.endsWith('>') ? 'tag' : /^[\w:.-]+="/.test(part) ? 'attr' : 'text',
   }) as const);

@@ -39,7 +39,7 @@ export default function InvoiceDetail({ facturaId, session, addToast, onChanged 
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [facturaId, session.token]);
 
   async function handleSend() {

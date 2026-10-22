@@ -39,7 +39,7 @@ export default function InvoiceAccount({ facturaId, session, addToast, onChanged
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [facturaId, session.token]);
 
   if (!cuenta) return <div className="text-xs text-[#6e7681]">Cargando estado de cuenta...</div>;

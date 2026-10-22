@@ -64,7 +64,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
   function handleCreated(facturaId: string) {
     setFormOpen(false);
     setDetailId(facturaId);
-    load();
+    void load();
   }
 
   const columns = [

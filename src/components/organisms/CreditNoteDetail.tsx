@@ -38,7 +38,7 @@ export default function CreditNoteDetail({ notaId, session, addToast, onChanged 
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [notaId, session.token]);
 
   async function handleSend() {

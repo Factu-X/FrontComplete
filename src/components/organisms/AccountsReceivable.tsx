@@ -49,7 +49,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [filtro, session.token]);
 
   const resumen = cartera?.resumen;
@@ -158,7 +158,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
             facturaId={selected.id}
             session={session}
             addToast={addToast}
-            onChanged={() => { load(); onChanged?.(); }}
+            onChanged={() => { void load(); onChanged?.(); }}
           />
         </Modal>
       )}
