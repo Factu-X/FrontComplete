@@ -19,12 +19,10 @@ import DemoNotice from './components/molecules/DemoNotice';
 import { apiRequest, setUnauthorizedHandler } from './lib/api';
 import { supabase } from './lib/supabase';
 import { canAccessPage, ROLE_LABELS, roleFromProfile } from './lib/roles';
-import type { AuthUser, BackendConfiguracion, BackendProfile } from './lib/types';
-import { Customer, Order, Reminder, Invoice, CreditNote, UsabilitySession } from './types';
+import type { AuthUser, BackendCartera, BackendConfiguracion, BackendProfile } from './lib/types';
+import { Customer, Reminder, UsabilitySession } from './types';
 import {
-  initialCustomers, initialOrders,
-  initialReminders, initialInvoices,
-  initialCreditNotes, initialUsabilitySessions,
+  initialCustomers, initialReminders, initialUsabilitySessions,
 } from './data/initialData';
 
 type AuthState = { user: AuthUser; token: string } | null;
@@ -35,16 +33,13 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // shortcut: recordatorios (HU-11), notas crédito (HU-08), cartera (HU-10), dashboard de facturación (HU-09)
-  // y usabilidad (HU-14) siguen con datos de prueba y se marcan con DemoNotice; conectarlos cuando exista su API.
-  // Clientes, catálogo, órdenes, usuarios, configuración y facturación ya usan la API.
+  // shortcut: recordatorios (HU-11) y usabilidad (HU-14) siguen con datos de prueba y se marcan con
+  // DemoNotice; conectarlos cuando exista su API. Todo lo demás ya usa la API.
   const [mockCustomers] = useState<Customer[]>(initialCustomers);
-  const [mockOrders] = useState<Order[]>(initialOrders);
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
   const [menuOpen, setMenuOpen] = useState(false);
   const [configComplete, setConfigComplete] = useState(true);
-  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
-  const [creditNotes, setCreditNotes] = useState<CreditNote[]>(initialCreditNotes);
+  const [overdueInvoices, setOverdueInvoices] = useState(0);
   const [usabilitySessions, setUsabilitySessions] = useState<UsabilitySession[]>(initialUsabilitySessions);
 
   const addToast = useCallback((t: Omit<ToastItem, 'id'>) => {
@@ -64,6 +59,18 @@ export default function App() {
     });
     return () => setUnauthorizedHandler(null);
   }, [auth?.user.id, addToast]);
+
+  // El número junto a "Cartera" son las facturas vencidas reales (HU-10).
+  const refreshOverdue = useCallback((token: string) => {
+    apiRequest<{ data: BackendCartera }>('/cartera?filtro=VENCIDAS', { token })
+      .then(response => setOverdueInvoices(response.data.resumen.facturasVencidas))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!auth || auth.user.role === 'operator') return;
+    refreshOverdue(auth.token);
+  }, [auth?.token, auth?.user.role, refreshOverdue]);
 
   // El aviso del menú refleja la configuración real (HU-13); el operario no la consulta.
   useEffect(() => {
@@ -163,6 +170,7 @@ export default function App() {
         onLogout={handleLogout}
         reminderCount={pendingReminderCount}
         configComplete={configComplete}
+        pendingReceivables={overdueInvoices}
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
       />
@@ -206,35 +214,13 @@ export default function App() {
             <InvoiceManager session={session} addToast={addToast} />
           )}
           {canView('credit-notes') && (
-            <>
-              <DemoNotice hu="HU-08" />
-              <CreditNoteManager
-                creditNotes={creditNotes}
-                setCreditNotes={setCreditNotes}
-                invoices={invoices}
-                setInvoices={setInvoices}
-                addToast={addToast}
-              />
-            </>
+            <CreditNoteManager session={session} addToast={addToast} />
           )}
           {canView('receivables') && (
-            <>
-              <DemoNotice hu="HU-10" />
-              <AccountsReceivable
-                invoices={invoices}
-                setInvoices={setInvoices}
-              />
-            </>
+            <AccountsReceivable session={session} addToast={addToast} onChanged={() => refreshOverdue(auth.token)} />
           )}
           {canView('billing-dashboard') && (
-            <>
-              <DemoNotice hu="HU-09" />
-              <BillingDashboard
-                invoices={invoices}
-                orders={mockOrders}
-                creditNotes={creditNotes}
-              />
-            </>
+            <BillingDashboard session={session} addToast={addToast} />
           )}
           {canView('settings') && (
             <CompanyConfigPage

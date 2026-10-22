@@ -1,181 +1,165 @@
-import React, { useState, useMemo } from 'react';
-import Button from '../atoms/Button';
+import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
+import Button from '../atoms/Button';
 import DataTable from '../molecules/DataTable';
-import SearchBar from '../molecules/SearchBar';
 import Modal from '../molecules/Modal';
-import { Invoice } from '../../types';
+import SearchBar from '../molecules/SearchBar';
+import { ToastItem } from '../molecules/ToastContainer';
+import InvoiceAccount from './InvoiceAccount';
+import { apiRequest, ApiEntityResponse, ApiSession } from '../../lib/api';
+import { ANTIGUEDAD_LABELS, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
+import { formatCOP, toNumber } from '../../lib/orders';
+import type { Antiguedad, BackendCartera, CuentaFactura } from '../../lib/types';
 
-const fmt = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+type Filtro = 'CON_SALDO' | 'VENCIDAS' | 'TODAS';
 
-function daysDiff(dateStr: string): number {
-  const due = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-}
+const filtros: [Filtro, string][] = [
+  ['CON_SALDO', 'Con saldo'],
+  ['VENCIDAS', 'Vencidas'],
+  ['TODAS', 'Todas'],
+];
+
+const BUCKET_COLOR: Record<Antiguedad, string> = {
+  AL_DIA: 'bg-emerald-500',
+  D1_30: 'bg-yellow-400',
+  D31_60: 'bg-orange-500',
+  D61_90: 'bg-red-500',
+  MAS_90: 'bg-red-700',
+};
 
 interface Props {
-  invoices: Invoice[];
-  setInvoices: React.Dispatch<React.SetStateAction<Invoice[]>>;
+  session: ApiSession;
+  addToast: (t: Omit<ToastItem, 'id'>) => void;
+  onChanged?: () => void;
 }
 
-export default function AccountsReceivable({ invoices }: Props) {
+export default function AccountsReceivable({ session, addToast, onChanged }: Props) {
+  const [cartera, setCartera] = useState<BackendCartera | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>('CON_SALDO');
   const [search, setSearch] = useState('');
-  const [filterCustomer, setFilterCustomer] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null);
+  const [selected, setSelected] = useState<CuentaFactura | null>(null);
 
-  // Only unpaid invoices
-  const pending = useMemo(() => invoices.filter(i =>
-    i.status !== 'cancelled' && i.paymentStatus !== 'paid'
-  ), [invoices]);
+  async function load() {
+    try {
+      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?filtro=${filtro}`, session);
+      setCartera(response.data);
+    } catch (error) {
+      addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar la cartera', type: 'error' });
+    }
+  }
 
-  const customers = useMemo(() => [...new Set(pending.map(i => i.customerName))].sort(), [pending]);
+  useEffect(() => {
+    load();
+  }, [filtro, session.token]);
 
-  const filtered = useMemo(() => pending.filter(i => {
-    const q = search.toLowerCase();
-    const matchQ = !q || i.invoiceNumber.toLowerCase().includes(q) || i.customerName.toLowerCase().includes(q);
-    const matchC = !filterCustomer || i.customerName === filterCustomer;
-    const issueDate = i.issuedAt.slice(0, 10);
-    const matchFrom = !dateFrom || issueDate >= dateFrom;
-    const matchTo = !dateTo || issueDate <= dateTo;
-    return matchQ && matchC && matchFrom && matchTo;
-  }).sort((a, b) => {
-    const dA = daysDiff(a.dueDate); const dB = daysDiff(b.dueDate);
-    return dB - dA; // most overdue first
-  }), [pending, search, filterCustomer, dateFrom, dateTo]);
+  const resumen = cartera?.resumen;
+  const q = search.trim().toLowerCase();
+  const filas = (cartera?.facturas ?? []).filter(f => !q
+    || f.numero.toLowerCase().includes(q)
+    || f.cliente.nombreRazonSocial.toLowerCase().includes(q)
+    || f.cliente.numeroIdentificacion.includes(q));
 
-  const totalPending = filtered.reduce((s, i) => s + (i.total - i.creditNotesTotal - i.paidAmount), 0);
-  const overdueCount = filtered.filter(i => daysDiff(i.dueDate) > 0).length;
+  const totalBuckets = resumen ? Object.values(resumen.porAntiguedad).reduce((t, v) => t + toNumber(v), 0) : 0;
 
   const columns = [
-    { key: 'number', header: 'N° Factura', render: (i: Invoice) => <span className="font-mono text-xs font-bold text-[#f97316]">{i.invoiceNumber}</span> },
-    { key: 'customer', header: 'Cliente', render: (i: Invoice) => <div className="font-medium text-[#e6edf3]">{i.customerName}</div> },
-    { key: 'issued', header: 'Emisión', render: (i: Invoice) => <span className="font-mono text-xs text-[#6e7681]">{new Date(i.issuedAt).toLocaleDateString('es-CO')}</span> },
-    { key: 'due', header: 'Vencimiento', render: (i: Invoice) => {
-      const days = daysDiff(i.dueDate);
-      const overdue = days > 0 && i.paymentType === 'credit';
-      return (
-        <div>
-          <span className={`font-mono text-xs ${overdue ? 'text-red-400 font-bold' : 'text-[#8b949e]'}`}>
-            {i.paymentType === 'cash' ? 'Contado' : new Date(i.dueDate + 'T00:00:00').toLocaleDateString('es-CO')}
-          </span>
-          {overdue && <div className="text-[10px] text-red-400 font-mono">{days}d vencida</div>}
-        </div>
-      );
-    }},
-    { key: 'total', header: 'Total factura', render: (i: Invoice) => <span className="font-mono text-sm text-[#8b949e]">{fmt(i.total)}</span> },
-    { key: 'paid', header: 'Pagado', render: (i: Invoice) => <span className="font-mono text-sm text-emerald-400">{fmt(i.paidAmount + i.creditNotesTotal)}</span> },
-    { key: 'balance', header: 'Saldo pendiente', render: (i: Invoice) => {
-      const balance = i.total - i.creditNotesTotal - i.paidAmount;
-      const days = daysDiff(i.dueDate);
-      return (
-        <div>
-          <span className={`font-mono text-sm font-bold ${days > 0 && i.paymentType === 'credit' ? 'text-red-400' : 'text-yellow-400'}`}>{fmt(balance)}</span>
-          {i.paymentStatus === 'partial' && <div className="text-[10px] text-[#6e7681]">Pago parcial</div>}
-        </div>
-      );
-    }},
-    { key: 'type', header: 'Forma pago', render: (i: Invoice) => (
-      <Badge variant={i.paymentType === 'cash' ? 'service' : 'warning'}>{i.paymentType === 'cash' ? 'Contado' : 'Crédito'}</Badge>
+    { key: 'numero', header: 'Factura', render: (f: CuentaFactura) => (
+      <div>
+        <div className="font-mono text-xs text-[#f97316]">{f.numero}</div>
+        <div className="text-xs text-[#6e7681]">{new Date(f.fechaEmision).toLocaleDateString('es-CO')}</div>
+      </div>
     )},
-    { key: 'actions', header: '', render: (i: Invoice) => (
-      <Button size="sm" variant="ghost" onClick={() => setDetailInvoice(i)}>Ver detalle</Button>
+    { key: 'cliente', header: 'Cliente', render: (f: CuentaFactura) => (
+      <div>
+        <div className="text-sm text-[#e6edf3]">{f.cliente.nombreRazonSocial}</div>
+        <div className="font-mono text-xs text-[#6e7681]">{f.cliente.telefono ?? f.cliente.numeroIdentificacion}</div>
+      </div>
+    )},
+    { key: 'vence', header: 'Vence', render: (f: CuentaFactura) => (
+      <div>
+        <div className="font-mono text-xs text-[#8b949e]">{f.vencimiento}</div>
+        {f.diasVencida > 0 && <div className="text-xs text-red-400">{f.diasVencida} días</div>}
+      </div>
+    )},
+    { key: 'total', header: 'Total', render: (f: CuentaFactura) => <span className="font-mono text-xs text-[#8b949e]">{formatCOP(f.total)}</span> },
+    { key: 'saldo', header: 'Saldo', render: (f: CuentaFactura) => <span className="font-mono text-sm font-semibold text-[#e6edf3]">{formatCOP(f.saldo)}</span> },
+    { key: 'estado', header: 'Estado', render: (f: CuentaFactura) => <Badge variant={PAGO_BADGE[f.estadoPago]}>{PAGO_LABELS[f.estadoPago]}</Badge> },
+    { key: 'actions', header: '', render: (f: CuentaFactura) => (
+      <div className="flex justify-end">
+        <Button size="sm" variant={toNumber(f.saldo) > 0 ? 'outline' : 'ghost'} onClick={() => setSelected(f)}>
+          {toNumber(f.saldo) > 0 ? 'Cobrar' : 'Ver'}
+        </Button>
+      </div>
     )},
   ];
 
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-xl font-bold text-[#e6edf3]">Cuentas por Cobrar</h1>
-        <p className="text-sm text-[#6e7681] mt-0.5">HU-10 · Facturas con pagos pendientes</p>
+        <h1 className="text-xl font-bold text-[#e6edf3]">Cartera</h1>
+        <p className="text-sm text-[#6e7681] mt-0.5">HU-10 · Cuentas por cobrar, abonos y antigüedad de la deuda</p>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Facturas pendientes', value: pending.length, color: 'text-[#e6edf3]' },
-          { label: 'Total por cobrar', value: fmt(pending.reduce((s, i) => s + (i.total - i.creditNotesTotal - i.paidAmount), 0)), color: 'text-yellow-400' },
-          { label: 'Vencidas', value: overdueCount, color: overdueCount > 0 ? 'text-red-400' : 'text-[#6e7681]' },
-          { label: 'Con pago parcial', value: pending.filter(i => i.paymentStatus === 'partial').length, color: 'text-blue-400' },
+          { label: 'Por cobrar', value: formatCOP(resumen?.porCobrar ?? 0), color: 'text-[#f97316]' },
+          { label: 'Vencido', value: formatCOP(resumen?.vencido ?? 0), color: 'text-red-400' },
+          { label: 'Facturas con saldo', value: String(resumen?.facturasConSaldo ?? 0), color: 'text-[#e6edf3]' },
+          { label: 'Facturas vencidas', value: String(resumen?.facturasVencidas ?? 0), color: 'text-yellow-400' },
         ].map(s => (
-          <div key={s.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3">
-            <div className={`text-xl font-bold font-mono ${s.color}`}>{s.value}</div>
+          <div key={s.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3 min-w-0">
+            <div className={`text-xl font-bold font-mono truncate ${s.color}`}>{s.value}</div>
             <div className="text-xs text-[#6e7681] mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
 
-      {overdueCount > 0 && (
-        <div className="px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-[6px] flex items-center gap-3">
-          <span className="text-red-400 text-lg">⚠</span>
-          <span className="text-sm text-red-300 font-medium">{overdueCount} factura{overdueCount > 1 ? 's' : ''} vencida{overdueCount > 1 ? 's' : ''}.</span>
-          <span className="text-xs text-red-400/70">Días contados desde la fecha de vencimiento.</span>
+      {resumen && totalBuckets > 0 && (
+        <div className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3 flex flex-col gap-3">
+          <div className="text-xs text-[#6e7681] uppercase tracking-wider">Antigüedad de la deuda</div>
+          <div className="flex h-2.5 rounded-full overflow-hidden bg-[#21262d]" aria-hidden="true">
+            {(Object.keys(resumen.porAntiguedad) as Antiguedad[]).map(b => (
+              <div key={b} className={BUCKET_COLOR[b]} style={{ width: `${(toNumber(resumen.porAntiguedad[b]) / totalBuckets) * 100}%` }} />
+            ))}
+          </div>
+          <dl className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+            {(Object.keys(resumen.porAntiguedad) as Antiguedad[]).map(b => (
+              <div key={b} className="flex items-start gap-2 min-w-0">
+                <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${BUCKET_COLOR[b]}`} />
+                <div className="min-w-0">
+                  <dt className="text-[#8b949e]">{ANTIGUEDAD_LABELS[b]}</dt>
+                  <dd className="font-mono text-[#e6edf3] truncate">{formatCOP(resumen.porAntiguedad[b])}</dd>
+                </div>
+              </div>
+            ))}
+          </dl>
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex-1 min-w-48"><SearchBar value={search} onChange={setSearch} placeholder="Buscar por N° factura o cliente..." /></div>
-        <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)}
-          className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] focus:outline-none focus:border-[#f97316]">
-          <option value="" className="bg-[#161b22]">Todos los clientes</option>
-          {customers.map(c => <option key={c} value={c} className="bg-[#161b22]">{c}</option>)}
-        </select>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-2 text-xs text-[#e6edf3] focus:outline-none focus:border-[#f97316]" />
-        <span className="text-xs text-[#6e7681]">—</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="bg-[#0d1117] border border-[#30363d] rounded px-2 py-2 text-xs text-[#e6edf3] focus:outline-none focus:border-[#f97316]" />
-        {(filterCustomer || dateFrom || dateTo) && (
-          <button onClick={() => { setFilterCustomer(''); setDateFrom(''); setDateTo(''); }} className="text-xs text-[#6e7681] hover:text-[#ef4444]">✕ Limpiar</button>
-        )}
+        <div className="flex-1 min-w-48">
+          <SearchBar value={search} onChange={setSearch} placeholder="Buscar por factura, cliente o documento..." />
+        </div>
+        <div className="flex max-w-full overflow-x-auto rounded-[6px] border border-[#30363d] text-xs">
+          {filtros.map(([v, l]) => (
+            <button
+              key={v}
+              onClick={() => setFiltro(v)}
+              className={`whitespace-nowrap px-3 py-2 transition-colors ${filtro === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
+            >{l}</button>
+          ))}
+        </div>
       </div>
 
-      {filtered.length > 0 && (
-        <div className="flex justify-between items-center px-1">
-          <span className="text-xs text-[#6e7681]">{filtered.length} resultado{filtered.length > 1 ? 's' : ''}</span>
-          <span className="font-mono text-sm font-bold text-yellow-400">Total filtrado: {fmt(totalPending)}</span>
-        </div>
-      )}
+      <DataTable columns={columns} data={filas} emptyMessage={cartera ? 'No hay facturas con este filtro' : 'Cargando cartera...'} />
 
-      <DataTable columns={columns} data={filtered} emptyMessage="No hay facturas con pagos pendientes" />
-
-      {/* Detail modal */}
-      {detailInvoice && (
-        <Modal title={`Detalle — ${detailInvoice.invoiceNumber}`} open={!!detailInvoice} onClose={() => setDetailInvoice(null)} width="max-w-xl">
-          {detailInvoice && (
-            <div className="flex flex-col gap-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div><span className="text-[#6e7681]">Cliente:</span><div className="font-medium text-[#e6edf3]">{detailInvoice.customerName}</div></div>
-                <div><span className="text-[#6e7681]">Emisión:</span><div className="font-mono text-xs">{new Date(detailInvoice.issuedAt).toLocaleDateString('es-CO')}</div></div>
-                <div><span className="text-[#6e7681]">Forma pago:</span><div className="text-xs">{detailInvoice.paymentType === 'cash' ? 'Contado' : `Crédito — vence ${detailInvoice.dueDate}`}</div></div>
-                <div><span className="text-[#6e7681]">Estado:</span><div><Badge variant={detailInvoice.paymentStatus === 'partial' ? 'warning' : 'inactive'}>{detailInvoice.paymentStatus === 'partial' ? 'Pago parcial' : 'Pendiente'}</Badge></div></div>
-              </div>
-              <div className="bg-[#0d1117] border border-[#30363d] rounded px-4 py-3 space-y-1.5">
-                <div className="flex justify-between"><span className="text-[#8b949e]">Total factura</span><span className="font-mono text-[#e6edf3]">{fmt(detailInvoice.total)}</span></div>
-                {detailInvoice.creditNotesTotal > 0 && <div className="flex justify-between"><span className="text-[#8b949e]">Notas crédito</span><span className="font-mono text-red-400">-{fmt(detailInvoice.creditNotesTotal)}</span></div>}
-                <div className="flex justify-between"><span className="text-[#8b949e]">Pagado</span><span className="font-mono text-emerald-400">{fmt(detailInvoice.paidAmount)}</span></div>
-                <div className="border-t border-[#30363d] pt-2 flex justify-between font-bold">
-                  <span className="text-[#e6edf3]">Saldo pendiente</span>
-                  <span className="font-mono text-yellow-400 text-lg">{fmt(detailInvoice.total - detailInvoice.creditNotesTotal - detailInvoice.paidAmount)}</span>
-                </div>
-                {detailInvoice.paymentType === 'credit' && daysDiff(detailInvoice.dueDate) > 0 && (
-                  <div className="text-xs text-red-400 flex items-center gap-1.5"><span>⚠</span>{daysDiff(detailInvoice.dueDate)} días de mora</div>
-                )}
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-[#8b949e] uppercase tracking-wider mb-2">Conceptos</div>
-                {detailInvoice.items.map(item => (
-                  <div key={item.id} className="flex justify-between text-xs py-1 border-b border-[#30363d]/40">
-                    <span className="text-[#e6edf3]">{item.name} <span className="text-[#6e7681]">×{item.quantity}</span></span>
-                    <span className="font-mono text-[#8b949e]">{fmt(item.total)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      {selected && (
+        <Modal title={`Cuenta de ${selected.numero} · ${selected.cliente.nombreRazonSocial}`} open={!!selected} onClose={() => setSelected(null)} width="max-w-2xl">
+          <InvoiceAccount
+            facturaId={selected.id}
+            session={session}
+            addToast={addToast}
+            onChanged={() => { load(); onChanged?.(); }}
+          />
         </Modal>
       )}
     </div>

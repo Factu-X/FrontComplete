@@ -95,6 +95,9 @@ export type BackendDetalleOrden = {
   total: string;
 };
 
+export type EstadoDian = 'PENDIENTE_ENVIO' | 'ENVIADA' | 'VALIDADA' | 'RECHAZADA';
+export type FormaPago = 'CONTADO' | 'CREDITO';
+
 export type BackendFactura = {
   id: string;
   ordenId: string;
@@ -103,19 +106,22 @@ export type BackendFactura = {
   consecutivo: number;
   numero: string;
   fechaEmision: string;
-  formaPago: 'CONTADO' | 'CREDITO';
+  fechaVencimiento: string | null;
+  formaPago: FormaPago;
   subtotal: string;
   impuestos: string;
   total: string;
-  estadoDian: EstadoDian;
-  fechaVencimiento: string | null;
   cufe: string | null;
   xmlPath: string | null;
-  cliente?: BackendCliente;
-  orden?: BackendOrden;
+  estadoDian: EstadoDian;
+  cliente: Pick<BackendCliente, 'id' | 'tipoIdentificacion' | 'numeroIdentificacion' | 'nombreRazonSocial'>;
+  orden: {
+    id: string;
+    numero: string;
+    motocicletaId: string;
+    motocicleta: Pick<BackendMotocicleta, 'id' | 'placa' | 'marca' | 'modelo'>;
+  };
 };
-
-export type EstadoDian = 'PENDIENTE_ENVIO' | 'ENVIADA' | 'VALIDADA' | 'RECHAZADA';
 
 export type BackendDetalleFactura = {
   id: string;
@@ -127,6 +133,20 @@ export type BackendDetalleFactura = {
   subtotal: string;
   impuesto: string;
   total: string;
+  detalleOrden: { tipoItem: 'SERVICIO' | 'REPUESTO'; tratamientoIva: TratamientoIva } | null;
+};
+
+export type BackendFacturaCompleta = Omit<BackendFactura, 'cliente' | 'orden'> & {
+  cliente: BackendCliente;
+  orden: {
+    id: string;
+    numero: string;
+    fechaIngreso: string;
+    kilometrajeIngreso: number;
+    motivoIngreso: string;
+    motocicleta: BackendMotocicleta;
+  };
+  detallesFacturas: BackendDetalleFactura[];
 };
 
 export type BackendEmpresa = {
@@ -179,4 +199,152 @@ export type BackendConfiguracion = {
     faltantesTransmision: string[];
     advertencias: string[];
   };
+};
+
+export type BackendEnvioDian = {
+  id: string;
+  numeroIntento: number;
+  fechaEnvio: string;
+  estado: 'PENDIENTE' | 'ENVIADO' | 'VALIDADO' | 'RECHAZADO' | 'ERROR_CONEXION';
+  codigoRespuesta: string | null;
+  mensajeRespuesta: string | null;
+};
+
+export type ResultadoEnvioDian = {
+  estado: 'VALIDADO' | 'RECHAZADO';
+  codigo: string;
+  mensaje: string;
+  errores: { regla: string; mensaje: string }[];
+};
+
+export type TipoAjusteNota = 'TOTAL' | 'PARCIAL';
+
+export type BackendNotaCredito = {
+  id: string;
+  facturaId: string;
+  numero: string;
+  tipoAjuste: TipoAjusteNota;
+  motivo: string;
+  fechaEmision: string;
+  subtotal: string;
+  impuestos: string;
+  total: string;
+  cude: string | null;
+  estadoDian: EstadoDian;
+  factura: {
+    id: string;
+    numero: string;
+    cufe: string | null;
+    fechaEmision: string;
+    total: string;
+    cliente: Pick<BackendCliente, 'id' | 'tipoIdentificacion' | 'numeroIdentificacion' | 'nombreRazonSocial'>;
+  };
+};
+
+export type BackendDetalleNotaCredito = {
+  id: string;
+  descripcion: string;
+  cantidad: string;
+  precioUnitario: string;
+  tarifaIva: string;
+  subtotal: string;
+  impuesto: string;
+  total: string;
+  detalleFactura: { id: string; codigoItem: string | null; detalleOrden: { tipoItem: 'SERVICIO' | 'REPUESTO'; tratamientoIva: TratamientoIva } | null } | null;
+};
+
+export type BackendNotaCreditoCompleta = BackendNotaCredito & { detallesNotaCreditos: BackendDetalleNotaCredito[] };
+
+export type LineaAcreditable = {
+  id: string;
+  codigoItem: string | null;
+  descripcion: string;
+  cantidad: string;
+  precioUnitario: string;
+  tarifaIva: string;
+  tratamientoIva: TratamientoIva;
+  disponible: string;
+};
+
+export type BackendAcreditable = {
+  facturaId: string;
+  numero: string;
+  estadoDian: EstadoDian;
+  puedeAcreditar: boolean;
+  lineas: LineaAcreditable[];
+};
+
+export type Antiguedad = 'AL_DIA' | 'D1_30' | 'D31_60' | 'D61_90' | 'MAS_90';
+export type EstadoPago = 'PENDIENTE' | 'PARCIAL' | 'PAGADA' | 'ANULADA';
+export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | 'OTRO';
+
+export type CuentaFactura = {
+  id: string;
+  numero: string;
+  fechaEmision: string;
+  formaPago: FormaPago;
+  vencimiento: string;
+  estadoDian: EstadoDian;
+  total: string;
+  cliente: Pick<BackendCliente, 'id' | 'tipoIdentificacion' | 'numeroIdentificacion' | 'nombreRazonSocial' | 'telefono' | 'email'>;
+  acreditado: string;
+  pagado: string;
+  saldo: string;
+  diasVencida: number;
+  antiguedad: Antiguedad;
+  estadoPago: EstadoPago;
+};
+
+export type ResumenCartera = {
+  porCobrar: string;
+  vencido: string;
+  facturasConSaldo: number;
+  facturasVencidas: number;
+  porAntiguedad: Record<Antiguedad, string>;
+};
+
+export type BackendCartera = { resumen: ResumenCartera; facturas: CuentaFactura[] };
+
+export type BackendPago = {
+  id: string;
+  fechaPago: string;
+  monto: string;
+  metodoPago: MetodoPago;
+  referencia: string | null;
+  observaciones: string | null;
+};
+
+export type EstadoCuentaFactura = {
+  facturaId: string;
+  total: string;
+  vencimiento: string;
+  acreditado: string;
+  pagado: string;
+  saldo: string;
+  diasVencida: number;
+  antiguedad: Antiguedad;
+  estadoPago: EstadoPago;
+  pagos: BackendPago[];
+  notasCredito: { id: string; numero: string; tipoAjuste: TipoAjusteNota; total: string; estadoDian: EstadoDian }[];
+};
+
+export type ReporteFacturacion = {
+  rango: { desde: string; hasta: string };
+  totales: {
+    facturas: number;
+    facturado: string;
+    subtotal: string;
+    iva: string;
+    notasCredito: string;
+    neto: string;
+    recaudado: string;
+    ticketPromedio: string;
+  };
+  porEstadoDian: Partial<Record<EstadoDian, number>>;
+  porFormaPago: Partial<Record<FormaPago, number>>;
+  recaudoPorMetodo: Partial<Record<MetodoPago, string>>;
+  serie: { fecha: string; facturas: number; total: string }[];
+  topItems: { codigo: string | null; descripcion: string; cantidad: string; total: string }[];
+  topClientes: { id: string; nombre: string; documento: string; facturas: number; total: string }[];
+  cartera: ResumenCartera;
 };
