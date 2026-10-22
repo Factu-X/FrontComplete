@@ -69,7 +69,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [session.token]);
 
   // shortcut: el filtro "sin factura" se hace en el cliente; mover a la API si las órdenes finalizadas crecen mucho.
