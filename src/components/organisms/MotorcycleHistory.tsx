@@ -35,7 +35,7 @@ export default function MotorcycleHistory({ motorcycle, customerName, session, a
   const [selectedOrder, setSelectedOrder] = useState<BackendOrden | null>(null);
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const response = await apiRequest<ApiListResponse<BackendOrden>>(
           `/ordenes?motocicletaId=${motorcycle.id}`,

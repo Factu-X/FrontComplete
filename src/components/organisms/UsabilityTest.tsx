@@ -216,8 +216,8 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
               <div className="text-xs text-[#6e7681] mt-1 font-mono">{tasksCompleted}/{TASKS.length} tareas completadas</div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Observaciones generales</label>
-              <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={3} placeholder="Dificultades, errores, comentarios del participante..." className="w-full bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] placeholder-[#6e7681] focus:outline-none focus:border-[#f97316] resize-none" />
+              <label htmlFor="usability-observations" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Observaciones generales</label>
+              <textarea id="usability-observations" value={observations} onChange={e => setObservations(e.target.value)} rows={3} placeholder="Dificultades, errores, comentarios del participante..." className="w-full bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] placeholder-[#6e7681] focus:outline-none focus:border-[#f97316] resize-none" />
             </div>
           </div>
         )}
@@ -253,8 +253,8 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
               </div>
               <div className="flex gap-2 items-end">
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Prioridad</label>
-                  <select value={newFinding.priority} onChange={e => setNewFinding(f => ({ ...f, priority: e.target.value as UsabilityFinding['priority'] }))} className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] focus:outline-none focus:border-[#f97316]">
+                  <label htmlFor="finding-priority" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Prioridad</label>
+                  <select id="finding-priority" value={newFinding.priority} onChange={e => setNewFinding(f => ({ ...f, priority: e.target.value as UsabilityFinding['priority'] }))} className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] focus:outline-none focus:border-[#f97316]">
                     <option value="critical" className="bg-[#161b22]">Crítico</option>
                     <option value="high" className="bg-[#161b22]">Alto</option>
                     <option value="medium" className="bg-[#161b22]">Medio</option>

@@ -117,7 +117,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
   }
 
   useEffect(() => {
-    loadCatalog();
+    void loadCatalog();
   }, [session.token, search, filterType, filterActive]);
 
   function openCreate() {
@@ -312,8 +312,9 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
             placeholder="Nombre del servicio o repuesto"
           />
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Descripción</label>
+            <label htmlFor="catalog-description" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Descripción</label>
             <textarea
+              id="catalog-description"
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               rows={3}

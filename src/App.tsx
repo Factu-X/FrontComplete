@@ -55,7 +55,7 @@ export default function App() {
       if (handled) return;
       handled = true;
       addToast({ message: 'Tu sesión venció. Inicia sesión de nuevo.', type: 'warning' });
-      supabase.auth.signOut();
+      void supabase.auth.signOut();
     });
     return () => setUnauthorizedHandler(null);
   }, [auth?.user.id, addToast]);
@@ -97,7 +97,7 @@ export default function App() {
       });
     }
 
-    (async () => {
+    void (async () => {
       try {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;

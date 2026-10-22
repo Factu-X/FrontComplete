@@ -55,7 +55,7 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [orderId, session.token]);
 
   useEffect(() => {

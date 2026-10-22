@@ -46,7 +46,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
   }
 
   useEffect(() => {
-    loadOrders();
+    void loadOrders();
   }, [session.token]);
 
   const filtered = orders.filter(o =>
@@ -56,7 +56,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
   function handleCreated(orden: BackendOrden) {
     setFormOpen(false);
     setDetailOrder(orden);
-    loadOrders();
+    void loadOrders();
   }
 
   const columns = [

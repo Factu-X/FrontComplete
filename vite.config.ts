@@ -32,7 +32,7 @@ react(),
     },
     server: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
-      port: parseInt(process.env.PORT || '8443'),
+      port: Number.parseInt(process.env.PORT || '8443'),
       strictPort: true,
       watch: {
         ignored: [
@@ -42,7 +42,7 @@ react(),
     },
     preview: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
-      port: parseInt(process.env.PORT || '8443'),
+      port: Number.parseInt(process.env.PORT || '8443'),
     },
   }
 })
@@ -295,7 +295,8 @@ function figmaReactRefreshBoundaryFallback(): Plugin {
         queueMicrotask(() => sendFullReload?.())
       }
 
-      return null
+      // Solo observa el modulo; null le dice a Vite que no cambie el codigo.
+      return null // NOSONAR
     },
   }
 }
