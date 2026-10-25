@@ -318,7 +318,7 @@ export default function CustomerManager({ addToast, session }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Clientes y Motocicletas</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-04 · Registro de clientes y vehículos del taller</p>
@@ -351,7 +351,7 @@ export default function CustomerManager({ addToast, session }: Props) {
         loading={saving}
       >
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
               label="Tipo ID *"
               options={idTypes}
@@ -375,7 +375,7 @@ export default function CustomerManager({ addToast, session }: Props) {
             error={errors.name}
             placeholder="Juan Carlos Pérez"
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Teléfono *"
               value={form.phone}
@@ -404,7 +404,7 @@ export default function CustomerManager({ addToast, session }: Props) {
       >
         {detailCustomer && (
           <div className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-[#6e7681]">Identificación:</span> <span className="font-mono ml-1">{detailCustomer.idType} {detailCustomer.idNumber}</span></div>
               <div><span className="text-[#6e7681]">Teléfono:</span> <span className="font-mono ml-1">{detailCustomer.phone}</span></div>
               <div className="col-span-2"><span className="text-[#6e7681]">Email:</span> <span className="ml-1">{detailCustomer.email || '—'}</span></div>
@@ -438,7 +438,7 @@ export default function CustomerManager({ addToast, session }: Props) {
             placeholder="ABC12D"
             disabled={!!editingMoto}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Marca *"
               value={motoForm.brand}

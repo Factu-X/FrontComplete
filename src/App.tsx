@@ -13,16 +13,17 @@ import BillingDashboard from './components/organisms/BillingDashboard';
 import CompanyConfigPage from './components/organisms/CompanyConfig';
 import UserManager from './components/organisms/UserManager';
 import UsabilityTest from './components/organisms/UsabilityTest';
-import Sidebar, { Page } from './components/organisms/Sidebar';
+import Sidebar, { Page, PAGE_LABELS } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
-import { apiRequest } from './lib/api';
+import DemoNotice from './components/molecules/DemoNotice';
+import { apiRequest, setUnauthorizedHandler } from './lib/api';
 import { supabase } from './lib/supabase';
 import { canAccessPage, ROLE_LABELS, roleFromProfile } from './lib/roles';
-import type { AuthUser, BackendProfile } from './lib/types';
-import { Customer, Order, Reminder, CompanyConfig, Invoice, CreditNote, UsabilitySession } from './types';
+import type { AuthUser, BackendConfiguracion, BackendProfile } from './lib/types';
+import { Customer, Order, Reminder, Invoice, CreditNote, UsabilitySession } from './types';
 import {
   initialCustomers, initialOrders,
-  initialReminders, initialCompanyConfig, initialInvoices,
+  initialReminders, initialInvoices,
   initialCreditNotes, initialUsabilitySessions,
 } from './data/initialData';
 
@@ -34,12 +35,14 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // shortcut: recordatorios, facturación DIAN, notas crédito, cartera y usabilidad siguen con datos de prueba;
-  // conectarlos cuando el backend exponga esos módulos. Clientes, catálogo, órdenes y usuarios ya usan la API.
+  // shortcut: recordatorios (HU-11), notas crédito (HU-08), cartera (HU-10), dashboard de facturación (HU-09)
+  // y usabilidad (HU-14) siguen con datos de prueba y se marcan con DemoNotice; conectarlos cuando exista su API.
+  // Clientes, catálogo, órdenes, usuarios, configuración y facturación ya usan la API.
   const [mockCustomers] = useState<Customer[]>(initialCustomers);
   const [mockOrders] = useState<Order[]>(initialOrders);
   const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
-  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(initialCompanyConfig);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [configComplete, setConfigComplete] = useState(true);
   const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>(initialCreditNotes);
   const [usabilitySessions, setUsabilitySessions] = useState<UsabilitySession[]>(initialUsabilitySessions);
@@ -48,6 +51,27 @@ export default function App() {
     const id = Date.now();
     setToasts(prev => [...prev, { ...t, id }]);
   }, []);
+
+  // Si el backend rechaza el token (vencido o revocado) se cierra la sesión una sola vez.
+  useEffect(() => {
+    if (!auth) return;
+    let handled = false;
+    setUnauthorizedHandler(() => {
+      if (handled) return;
+      handled = true;
+      addToast({ message: 'Tu sesión venció. Inicia sesión de nuevo.', type: 'warning' });
+      supabase.auth.signOut();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [auth?.user.id, addToast]);
+
+  // El aviso del menú refleja la configuración real (HU-13); el operario no la consulta.
+  useEffect(() => {
+    if (!auth || auth.user.role === 'operator') return;
+    apiRequest<{ data: BackendConfiguracion }>('/configuracion', { token: auth.token })
+      .then(response => setConfigComplete(response.data.estado.puedeEmitir))
+      .catch(() => setConfigComplete(false));
+  }, [auth?.token, auth?.user.role]);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -62,7 +86,7 @@ export default function App() {
       if (!active) return;
       setAuth({
         token,
-        user: { id: profile.data.id, email, role: roleFromProfile(profile.data.rol) },
+        user: { id: profile.data.id, email, name: profile.data.nombre, role: roleFromProfile(profile.data.rol) },
       });
     }
 
@@ -107,7 +131,7 @@ export default function App() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center text-[#8b949e] text-sm">
+      <div className="min-h-dvh bg-[#0d1117] flex items-center justify-center text-[#8b949e] text-sm">
         Validando sesión...
       </div>
     );
@@ -122,21 +146,15 @@ export default function App() {
     );
   }
 
-  const userName = auth.user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const userName = auth.user.name;
   const pendingReminderCount = reminders.filter(r => r.status === 'pending').length;
-  const pendingReceivables = invoices.filter(i => i.status !== 'cancelled' && i.paymentStatus !== 'paid').length;
-  const configComplete = !!(
-    companyConfig.nit && companyConfig.businessName && companyConfig.resolutionNumber &&
-    companyConfig.invoicePrefix && companyConfig.rangeFrom && companyConfig.rangeTo &&
-    companyConfig.dianClientId && companyConfig.dianClientSecret
-  );
 
   const session = { token: auth.token };
   const role = auth.user.role;
   const canView = (p: Page) => page === p && canAccessPage(role, p);
 
   return (
-    <div className="flex min-h-screen bg-[#0d1117]">
+    <div className="flex min-h-dvh bg-[#0d1117]">
       <Sidebar
         current={page}
         onNavigate={setPage}
@@ -145,11 +163,23 @@ export default function App() {
         onLogout={handleLogout}
         reminderCount={pendingReminderCount}
         configComplete={configComplete}
-        pendingReceivables={pendingReceivables}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
       />
 
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-6 py-7">
+      <div className="flex-1 min-w-0 flex flex-col">
+      <header className="lg:hidden sticky top-0 z-20 flex items-center gap-3 h-14 px-4 bg-[#161b22] border-b border-[#30363d]">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Abrir menú"
+          className="-ml-1 p-1.5 rounded-[6px] text-[#e6edf3] text-xl leading-none hover:bg-[#21262d]"
+        >☰</button>
+        <div className="w-7 h-7 bg-[#f97316] rounded flex items-center justify-center font-bold text-[#0d1117] text-xs shrink-0">FX</div>
+        <span className="font-semibold text-[#e6edf3] truncate">{PAGE_LABELS[page]}</span>
+      </header>
+
+      <main className="flex-1 min-w-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
           {canView('dashboard') && (
             <DashboardPage
               userRole={role}
@@ -162,61 +192,70 @@ export default function App() {
           {canView('catalog') && <CatalogManager session={session} userRole={role} addToast={addToast} />}
           {canView('customers') && <CustomerManager session={session} addToast={addToast} />}
           {canView('reminders') && (
-            <RemindersManager
-              reminders={reminders}
-              setReminders={setReminders}
-              customers={mockCustomers}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-11" />
+              <RemindersManager
+                reminders={reminders}
+                setReminders={setReminders}
+                customers={mockCustomers}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('invoices') && (
-            <InvoiceManager
-              invoices={invoices}
-              setInvoices={setInvoices}
-              orders={mockOrders}
-              config={companyConfig}
-              setConfig={setCompanyConfig}
-              addToast={addToast}
-            />
+            <InvoiceManager session={session} addToast={addToast} />
           )}
           {canView('credit-notes') && (
-            <CreditNoteManager
-              creditNotes={creditNotes}
-              setCreditNotes={setCreditNotes}
-              invoices={invoices}
-              setInvoices={setInvoices}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-08" />
+              <CreditNoteManager
+                creditNotes={creditNotes}
+                setCreditNotes={setCreditNotes}
+                invoices={invoices}
+                setInvoices={setInvoices}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('receivables') && (
-            <AccountsReceivable
-              invoices={invoices}
-              setInvoices={setInvoices}
-            />
+            <>
+              <DemoNotice hu="HU-10" />
+              <AccountsReceivable
+                invoices={invoices}
+                setInvoices={setInvoices}
+              />
+            </>
           )}
           {canView('billing-dashboard') && (
-            <BillingDashboard
-              invoices={invoices}
-              orders={mockOrders}
-              creditNotes={creditNotes}
-            />
+            <>
+              <DemoNotice hu="HU-09" />
+              <BillingDashboard
+                invoices={invoices}
+                orders={mockOrders}
+                creditNotes={creditNotes}
+              />
+            </>
           )}
           {canView('settings') && (
             <CompanyConfigPage
-              config={companyConfig}
-              setConfig={setCompanyConfig}
+              session={session}
+              userRole={role}
               addToast={addToast}
+              onChanged={config => setConfigComplete(config.estado.puedeEmitir)}
             />
           )}
           {canView('users') && (
             <UserManager addToast={addToast} session={session} currentUserId={auth.user.id} />
           )}
           {canView('usability') && (
-            <UsabilityTest
-              sessions={usabilitySessions}
-              setSessions={setUsabilitySessions}
-              addToast={addToast}
-            />
+            <>
+              <DemoNotice hu="HU-14" />
+              <UsabilityTest
+                sessions={usabilitySessions}
+                setSessions={setUsabilitySessions}
+                addToast={addToast}
+              />
+            </>
           )}
           {canView('help') && (
             <HelpPage />
@@ -230,6 +269,7 @@ export default function App() {
           )}
         </div>
       </main>
+      </div>
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>

@@ -25,7 +25,7 @@ const PAGES_BY_ROLE: Record<UserRole, readonly string[] | 'all'> = {
   admin: 'all',
   billing: [
     'dashboard', 'orders', 'customers', 'catalog', 'reminders', 'invoices',
-    'credit-notes', 'receivables', 'billing-dashboard', 'help',
+    'credit-notes', 'receivables', 'billing-dashboard', 'settings', 'help',
   ],
   operator: ['dashboard', 'orders', 'help'],
 };
@@ -39,3 +39,6 @@ export const canManageCustomers = (role: UserRole) => role !== 'operator';
 export const canManageCatalog = (role: UserRole) => role === 'admin';
 export const canCreateOrders = (role: UserRole) => role !== 'operator';
 export const canCancelOrders = (role: UserRole) => role !== 'operator';
+// HU-13: Facturacion consulta la numeracion pero solo el administrador modifica la configuracion.
+export const canEditSettings = (role: UserRole) => role === 'admin';
+export const canInvoice = (role: UserRole) => role !== 'operator';

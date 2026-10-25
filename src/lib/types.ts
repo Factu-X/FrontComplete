@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'billing' | 'operator';
 export type AuthUser = {
   id: string;
   email: string;
+  name: string;
   role: UserRole;
 };
 
@@ -106,5 +107,76 @@ export type BackendFactura = {
   subtotal: string;
   impuestos: string;
   total: string;
-  estadoDian: 'PENDIENTE_ENVIO' | 'ENVIADA' | 'VALIDADA' | 'RECHAZADA';
+  estadoDian: EstadoDian;
+  fechaVencimiento: string | null;
+  cufe: string | null;
+  xmlPath: string | null;
+  cliente?: BackendCliente;
+  orden?: BackendOrden;
+};
+
+export type EstadoDian = 'PENDIENTE_ENVIO' | 'ENVIADA' | 'VALIDADA' | 'RECHAZADA';
+
+export type BackendDetalleFactura = {
+  id: string;
+  codigoItem: string | null;
+  descripcion: string;
+  cantidad: string;
+  precioUnitario: string;
+  tarifaIva: string;
+  subtotal: string;
+  impuesto: string;
+  total: string;
+};
+
+export type BackendEmpresa = {
+  nit: string;
+  digitoVerificacion: string | null;
+  razonSocial: string;
+  nombreComercial: string | null;
+  tipoPersona: 'JURIDICA' | 'NATURAL';
+  regimenFiscal: string | null;
+  responsabilidadesFiscales: string | null;
+  direccion: string | null;
+  ciudad: string | null;
+  departamento: string | null;
+  codigoMunicipio: string | null;
+  telefono: string | null;
+  email: string | null;
+};
+
+export type BackendNumeracion = {
+  ambiente: 'HABILITACION' | 'PRODUCCION';
+  prefijoFacturacion: string | null;
+  numeroResolucion: string | null;
+  fechaResolucion: string | null;
+  rangoDesde: number | null;
+  rangoHasta: number | null;
+  vigenciaDesde: string | null;
+  vigenciaHasta: string | null;
+  consecutivoActual: number | null;
+  siguienteConsecutivo: number | null;
+  disponibles: number;
+};
+
+export type BackendConfiguracion = {
+  empresa: BackendEmpresa | null;
+  numeracion: BackendNumeracion | null;
+  // Solo llega para el administrador (HU-13); nunca trae valores secretos.
+  credenciales?: {
+    softwareId: string | null;
+    testSetId: string | null;
+    pinConfigurado: boolean;
+    claveTecnicaConfigurada: boolean;
+    certificadoCargado: boolean;
+    certificadoExpira: string | null;
+    servicioSecretosDisponible: boolean;
+  };
+  estado: {
+    puedeEmitir: boolean;
+    faltantesEmision: string[];
+    puedeTransmitir: boolean;
+    faltantesTransmision: string[];
+    advertencias: string[];
+  };
 };

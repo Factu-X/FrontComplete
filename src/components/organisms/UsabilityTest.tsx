@@ -122,7 +122,7 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Pruebas de Usabilidad (SUS)</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-14 · Evaluación de usabilidad con usuarios piloto</p>
@@ -200,7 +200,7 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
         {step === 1 && (
           <div className="flex flex-col gap-4">
             <div className="text-sm font-semibold text-[#e6edf3] mb-1">Datos del participante y tareas</div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label="Nombre participante *" value={participantName} onChange={e => setParticipantName(e.target.value)} placeholder="Carlos M." />
               <Input label="Perfil / Rol" value={participantRole} onChange={e => setParticipantRole(e.target.value)} placeholder="Mecánico / Administrador" />
             </div>
@@ -247,7 +247,7 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
           <div className="flex flex-col gap-4">
             <div className="text-sm font-semibold text-[#e6edf3] mb-1">Hallazgos y problemas encontrados</div>
             <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Input label="Descripción del hallazgo" value={newFinding.description} onChange={e => setNewFinding(f => ({ ...f, description: e.target.value }))} placeholder="Descripción del problema..." />
                 <Input label="Pantalla / módulo" value={newFinding.screen} onChange={e => setNewFinding(f => ({ ...f, screen: e.target.value }))} placeholder="Ej: Clientes" />
               </div>
@@ -300,7 +300,7 @@ export default function UsabilityTest({ sessions, setSessions, addToast }: Props
       {detailSession && (
         <Modal title={`Sesión — ${detailSession.participantName}`} open={!!detailSession} onClose={() => setDetailSession(null)} width="max-w-xl">
           <div className="flex flex-col gap-4 text-sm">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><span className="text-[#6e7681]">Perfil:</span> <span className="text-[#e6edf3]">{detailSession.participantRole}</span></div>
               <div><span className="text-[#6e7681]">Fecha:</span> <span className="font-mono text-[#e6edf3]">{detailSession.sessionDate}</span></div>
               <div><span className="text-[#6e7681]">Tareas:</span> <span className="font-mono">{detailSession.tasksCompleted}/{detailSession.totalTasks}</span></div>

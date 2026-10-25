@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiRequest } from './api';
+import { ApiError, apiRequest, setUnauthorizedHandler } from './api';
 
 const mockFetch = (status: number, body: string) =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -12,6 +12,25 @@ const mockFetch = (status: number, body: string) =>
 describe('apiRequest', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    setUnauthorizedHandler(null);
+  });
+
+  it('notifies the app when the session is no longer valid', async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    mockFetch(401, JSON.stringify({ error: { message: 'Token invalido o expirado', code: 'UNAUTHORIZED' } }));
+
+    await expect(apiRequest('/ordenes', { token: 'jwt' })).rejects.toMatchObject({ status: 401 });
+    expect(handler).toHaveBeenCalledOnce();
+  });
+
+  it('does not end the session on a permission error', async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    mockFetch(403, JSON.stringify({ error: { message: 'Sin permisos', code: 'FORBIDDEN' } }));
+
+    await apiRequest('/usuarios', { token: 'jwt' }).catch(() => undefined);
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('sends the bearer token and parses JSON', async () => {
@@ -34,6 +53,21 @@ describe('apiRequest', () => {
     expect(error).toMatchObject({ message: 'Sin permisos', status: 403, code: 'FORBIDDEN' });
   });
 
+  it('shows the first validation detail so the user knows what to fix', async () => {
+    mockFetch(400, JSON.stringify({
+      error: {
+        message: 'La solicitud contiene datos invalidos',
+        code: 'VALIDATION_ERROR',
+        details: [{ path: 'rangoHasta', message: 'rangoDesde debe ser menor o igual a rangoHasta' }],
+      },
+    }));
+
+    await expect(apiRequest('/configuracion/resolucion', { token: 'jwt' })).rejects.toMatchObject({
+      message: 'La solicitud contiene datos invalidos: rangoDesde debe ser menor o igual a rangoHasta',
+      status: 400,
+    });
+  });
+
   it('falls back to a generic message on empty error bodies', async () => {
     mockFetch(500, '');
 
@@ -41,5 +75,14 @@ describe('apiRequest', () => {
       message: 'No fue posible completar la solicitud',
       status: 500,
     });
+  });
+
+  it('only calls relative API paths, never another host', async () => {
+    mockFetch(200, JSON.stringify({ data: [] }));
+
+    await expect(apiRequest('//evil.example/x', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('https://evil.example', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('/facturas/../usuarios', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
+    await expect(apiRequest('/reportes/facturacion?desde=2026-10-01&hasta=2026-10-31', { token: 'jwt' })).resolves.toEqual({ data: [] });
   });
 });

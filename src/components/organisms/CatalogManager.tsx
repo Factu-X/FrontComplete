@@ -42,6 +42,11 @@ const ivaOptions = [
   { value: 'EXCLUIDO', label: 'Excluido' },
 ];
 
+const taxRateOptions = [
+  { value: '19', label: '19% (general)' },
+  { value: '5', label: '5% (diferencial)' },
+];
+
 type CatalogForm = {
   code: string;
   name: string;
@@ -140,8 +145,8 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
     if (!form.name.trim()) e.name = 'El nombre es obligatorio';
     if (!form.type) e.type = 'El tipo es obligatorio';
     if (!form.price || form.price <= 0) e.price = 'El precio debe ser mayor a 0';
-    if (form.ivaTreatment === 'GRAVADO' && (form.taxRate <= 0 || form.taxRate > 100))
-      e.taxRate = 'La tarifa debe estar entre 0 y 100';
+    if (form.ivaTreatment === 'GRAVADO' && ![19, 5].includes(form.taxRate))
+      e.taxRate = 'Un ítem gravado solo admite IVA 19% o 5%';
     if (!editing && items.find(i => i.code.toLowerCase() === form.code.toLowerCase()))
       e.code = 'El código ya existe en el catálogo';
     return e;
@@ -236,7 +241,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Catálogo de Servicios y Repuestos</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-01 · Gestión del catálogo comercial del taller</p>
@@ -247,12 +252,12 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex-1 min-w-48"><SearchBar value={search} onChange={setSearch} placeholder="Buscar por código o nombre..." /></div>
         <Select options={typeOptions} value={filterType} onChange={e => setFilterType(e.target.value)} className="w-40" />
-        <div className="flex rounded-[6px] border border-[#30363d] overflow-hidden text-xs">
+        <div className="flex max-w-full overflow-x-auto rounded-[6px] border border-[#30363d] text-xs">
           {[['all', 'Todos'], ['active', 'Activos'], ['inactive', 'Inactivos']].map(([v, l]) => (
             <button
               key={v}
               onClick={() => setFilterActive(v)}
-              className={`px-3 py-2 transition-colors ${filterActive === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
+              className={`whitespace-nowrap px-3 py-2 transition-colors ${filterActive === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
             >{l}</button>
           ))}
         </div>
@@ -282,7 +287,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
         loading={saving}
       >
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Código *"
               value={form.code}
@@ -324,17 +329,18 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
             error={errors.price}
             placeholder="45000"
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
               label="Tratamiento IVA *"
               options={ivaOptions}
               value={form.ivaTreatment}
-              onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva }))}
+              onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva, taxRate: [19, 5].includes(f.taxRate) ? f.taxRate : 19 }))}
             />
-            <Input
+            {/* Tarifas vigentes: 19% general (E.T. art. 468) y 5% diferencial; exento/excluido = 0% */}
+            <Select
               label="Tarifa IVA (%)"
-              type="number"
-              value={form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0}
+              options={form.ivaTreatment === 'GRAVADO' ? taxRateOptions : [{ value: '0', label: '0%' }]}
+              value={String(form.ivaTreatment === 'GRAVADO' ? form.taxRate : 0)}
               onChange={e => setForm(f => ({ ...f, taxRate: Number(e.target.value) }))}
               error={errors.taxRate}
               disabled={form.ivaTreatment !== 'GRAVADO'}

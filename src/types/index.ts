@@ -93,30 +93,6 @@ export interface Reminder {
 
 // ─── Company / DIAN config (HU-13) ────────────────────────────────────────
 
-export interface CompanyConfig {
-  nit: string;
-  verificationDigit: string;
-  businessName: string;
-  tradeName: string;
-  address: string;
-  city: string;
-  phone: string;
-  email: string;
-  invoicePrefix: string;
-  resolutionNumber: string;
-  resolutionDate: string;
-  rangeFrom: number;
-  rangeTo: number;
-  validFrom: string;
-  validTo: string;
-  currentNumber: number;
-  dianEnv: 'production' | 'testing';
-  dianClientId: string;
-  dianClientSecret: string;
-  hasCertificate: boolean;
-  certificateName: string;
-}
-
 // ─── Invoices (HU-06 / HU-07 / HU-10) ────────────────────────────────────
 
 export type InvoiceStatus = 'draft' | 'generated' | 'transmitted' | 'accepted' | 'cancelled';

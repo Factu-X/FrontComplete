@@ -99,7 +99,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Órdenes de Servicio</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-02 · HU-03 · Registro y cálculo automático de órdenes</p>
@@ -124,12 +124,12 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
         <div className="flex-1 min-w-48">
           <SearchBar value={search} onChange={setSearch} placeholder="Buscar por N° orden, cliente o placa..." />
         </div>
-        <div className="flex rounded-[6px] border border-[#30363d] overflow-hidden text-xs">
+        <div className="flex max-w-full overflow-x-auto rounded-[6px] border border-[#30363d] text-xs">
           {statusFilterOptions.map(([v, l]) => (
             <button
               key={v}
               onClick={() => setFilterStatus(v)}
-              className={`px-3 py-2 transition-colors ${filterStatus === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
+              className={`whitespace-nowrap px-3 py-2 transition-colors ${filterStatus === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
             >{l}</button>
           ))}
         </div>

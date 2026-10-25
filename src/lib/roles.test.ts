@@ -5,6 +5,8 @@ import {
   canAccessPage,
   canCancelOrders,
   canCreateOrders,
+  canEditSettings,
+  canInvoice,
   canManageCatalog,
   canManageCustomers,
   roleFromProfile,
@@ -28,7 +30,15 @@ describe('roles', () => {
     expect(canAccessPage('billing', 'customers')).toBe(true);
     expect(canAccessPage('billing', 'invoices')).toBe(true);
     expect(canAccessPage('billing', 'users')).toBe(false);
-    expect(canAccessPage('billing', 'settings')).toBe(false);
+  });
+
+  it('lets billing read the settings but only the administrator edit them (HU-13)', () => {
+    expect(canAccessPage('billing', 'settings')).toBe(true);
+    expect(canAccessPage('operator', 'settings')).toBe(false);
+    expect(canEditSettings('admin')).toBe(true);
+    expect(canEditSettings('billing')).toBe(false);
+    expect(canInvoice('billing')).toBe(true);
+    expect(canInvoice('operator')).toBe(false);
   });
 
   it('limits the operator to orders', () => {

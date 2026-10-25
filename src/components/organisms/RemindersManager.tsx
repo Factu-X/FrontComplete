@@ -255,7 +255,7 @@ export default function RemindersManager({ reminders, setReminders, customers, a
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Recordatorios de Mantenimiento</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-11 · Seguimiento y alertas de servicios programados</p>
@@ -292,10 +292,10 @@ export default function RemindersManager({ reminders, setReminders, customers, a
         <div className="flex-1 min-w-48">
           <SearchBar value={search} onChange={setSearch} placeholder="Buscar por placa, cliente o tipo..." />
         </div>
-        <div className="flex rounded-[6px] border border-[#30363d] overflow-hidden text-xs">
+        <div className="flex max-w-full overflow-x-auto rounded-[6px] border border-[#30363d] text-xs">
           {[['all','Todos'],['pending','Pendientes'],['overdue','Vencidos'],['completed','Completados'],['cancelled','Cancelados']].map(([v,l]) => (
             <button key={v} onClick={() => setFilterStatus(v)}
-              className={`px-3 py-2 transition-colors ${filterStatus === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
+              className={`whitespace-nowrap px-3 py-2 transition-colors ${filterStatus === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
             >{l}</button>
           ))}
         </div>
