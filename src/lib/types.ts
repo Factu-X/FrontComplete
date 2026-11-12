@@ -31,6 +31,8 @@ export type BackendCliente = {
   telefono: string | null;
   email: string | null;
   activo: boolean;
+  // GET /clientes las incluye; el detalle y la creacion no.
+  motocicletas?: BackendMotocicleta[];
 };
 
 export type BackendMotocicleta = {

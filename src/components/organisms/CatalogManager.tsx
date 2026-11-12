@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -96,7 +96,18 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
 
   const canWrite = canManageCatalog(userRole);
 
+  // Solo la ultima busqueda pinta resultados: una respuesta vieja que llegue tarde se descarta.
+  const latestLoad = useRef(0);
+
+  // Pinta al instante lo que devolvio el backend y refresca la lista en segundo plano (orden y filtros).
+  function showSaved(item: BackendCatalogItem) {
+    const saved = mapCatalogItem(item);
+    setItems(prev => (prev.some(i => i.id === saved.id) ? prev.map(i => (i.id === saved.id ? saved : i)) : [saved, ...prev]));
+    void loadCatalog();
+  }
+
   async function loadCatalog() {
+    const loadId = ++latestLoad.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -108,16 +119,19 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
         `/catalogo${params.toString() ? `?${params.toString()}` : ''}`,
         session,
       );
+      if (loadId !== latestLoad.current) return;
       setItems(response.data.map(mapCatalogItem));
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar el catálogo', type: 'error' });
     } finally {
-      setLoading(false);
+      if (loadId === latestLoad.current) setLoading(false);
     }
   }
 
+  // Espera 300 ms a que el usuario deje de escribir antes de consultar.
   useEffect(() => {
-    void loadCatalog();
+    const timer = setTimeout(() => void loadCatalog(), search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [session.token, search, filterType, filterActive]);
 
   function openCreate() {
@@ -169,20 +183,21 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
       };
 
       if (editing) {
-        await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${editing.id}`, session, {
+        const response = await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${editing.id}`, session, {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
+        showSaved(response.data);
         addToast({ message: 'Elemento actualizado correctamente', type: 'success' });
       } else {
-        await apiRequest<ApiEntityResponse<BackendCatalogItem>>('/catalogo', session, {
+        const response = await apiRequest<ApiEntityResponse<BackendCatalogItem>>('/catalogo', session, {
           method: 'POST',
           body: JSON.stringify({ ...payload, activo: true }),
         });
+        showSaved(response.data);
         addToast({ message: 'Elemento registrado en el catálogo', type: 'success' });
       }
       setModalOpen(false);
-      await loadCatalog();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el elemento', type: 'error' });
     } finally {
@@ -193,13 +208,13 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
   async function handleToggle() {
     if (!confirmToggle) return;
     try {
-      await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${confirmToggle.id}`, session, {
+      const response = await apiRequest<ApiEntityResponse<BackendCatalogItem>>(`/catalogo/${confirmToggle.id}`, session, {
         method: 'PATCH',
         body: JSON.stringify({ activo: !confirmToggle.active }),
       });
+      showSaved(response.data);
       addToast({ message: confirmToggle.active ? 'Elemento desactivado' : 'Elemento activado', type: 'warning' });
       setConfirmToggle(null);
-      await loadCatalog();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cambiar el estado', type: 'error' });
     }

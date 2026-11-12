@@ -65,6 +65,13 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
   const [saving, setSaving] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState<User | null>(null);
 
+  // Pinta al instante lo que devolvio el backend y refresca la lista en segundo plano.
+  function showSaved(usuario: BackendUsuario) {
+    const saved = mapUser(usuario);
+    setUsers(prev => (prev.some(u => u.id === saved.id) ? prev.map(u => (u.id === saved.id ? saved : u)) : [saved, ...prev]));
+    void loadUsers();
+  }
+
   async function loadUsers() {
     setLoading(true);
     try {
@@ -120,7 +127,7 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
     setSaving(true);
     try {
       if (editingUser) {
-        await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${editingUser.id}`, session, {
+        const response = await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${editingUser.id}`, session, {
           method: 'PATCH',
           body: JSON.stringify({
             nombre: form.name.trim(),
@@ -128,9 +135,11 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
             ...(form.email.trim() !== editingUser.email ? { email: form.email.trim() } : {}),
           }),
         });
+        // El PATCH no devuelve el correo: se usa el del formulario.
+        showSaved({ ...response.data, email: form.email.trim() });
         addToast({ message: 'Usuario actualizado correctamente', type: 'success' });
       } else {
-        await apiRequest<ApiEntityResponse<BackendUsuario>>('/usuarios', session, {
+        const response = await apiRequest<ApiEntityResponse<BackendUsuario>>('/usuarios', session, {
           method: 'POST',
           body: JSON.stringify({
             nombre: form.name.trim(),
@@ -139,10 +148,10 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
             rol: BACKEND_ROLE[form.role],
           }),
         });
+        showSaved(response.data);
         addToast({ message: 'Usuario creado. Ya puede iniciar sesión.', type: 'success' });
       }
       setModalOpen(false);
-      await loadUsers();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el usuario', type: 'error' });
     } finally {
@@ -153,16 +162,16 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
   async function handleToggle() {
     if (!confirmToggle) return;
     try {
-      await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${confirmToggle.id}`, session, {
+      const response = await apiRequest<ApiEntityResponse<BackendUsuario>>(`/usuarios/${confirmToggle.id}`, session, {
         method: 'PATCH',
         body: JSON.stringify({ activo: !confirmToggle.active }),
       });
+      showSaved({ ...response.data, email: confirmToggle.email });
       addToast({
         message: confirmToggle.active ? `Cuenta de ${confirmToggle.name} desactivada` : `Cuenta de ${confirmToggle.name} activada`,
         type: confirmToggle.active ? 'warning' : 'success',
       });
       setConfirmToggle(null);
-      await loadUsers();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cambiar el estado', type: 'error' });
     }

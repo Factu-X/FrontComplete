@@ -1,18 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import LoginPage from './components/pages/LoginPage';
 import DashboardPage from './components/pages/DashboardPage';
-import HelpPage from './components/pages/HelpPage';
-import CatalogManager from './components/organisms/CatalogManager';
-import CustomerManager from './components/organisms/CustomerManager';
-import OrderManager from './components/organisms/OrderManager';
-import RemindersManager from './components/organisms/RemindersManager';
-import InvoiceManager from './components/organisms/InvoiceManager';
-import CreditNoteManager from './components/organisms/CreditNoteManager';
-import AccountsReceivable from './components/organisms/AccountsReceivable';
-import BillingDashboard from './components/organisms/BillingDashboard';
-import CompanyConfigPage from './components/organisms/CompanyConfig';
-import UserManager from './components/organisms/UserManager';
-import UsabilityTest from './components/organisms/UsabilityTest';
 import Sidebar, { Page, PAGE_LABELS } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
 import DemoNotice from './components/molecules/DemoNotice';
@@ -24,6 +12,34 @@ import { Customer, Reminder, UsabilitySession } from './types';
 import {
   initialCustomers, initialReminders, initialUsabilitySessions,
 } from './data/initialData';
+
+// Cada pantalla se descarga aparte; login, menu y dashboard van en el paquete inicial.
+const screenImports: Array<() => Promise<unknown>> = [];
+function lazyScreen<T extends React.ComponentType<any>>(importer: () => Promise<{ default: T }>) {
+  screenImports.push(importer);
+  return lazy(() =>
+    importer().catch(error => {
+      // Tras un despliegue nuevo los archivos viejos ya no existen: se recarga una vez para traer la version actual.
+      if (sessionStorage.getItem('factux-chunk-reload')) throw error;
+      sessionStorage.setItem('factux-chunk-reload', '1');
+      window.location.reload();
+      return new Promise<never>(() => undefined);
+    }),
+  );
+}
+
+const HelpPage = lazyScreen(() => import('./components/pages/HelpPage'));
+const CatalogManager = lazyScreen(() => import('./components/organisms/CatalogManager'));
+const CustomerManager = lazyScreen(() => import('./components/organisms/CustomerManager'));
+const OrderManager = lazyScreen(() => import('./components/organisms/OrderManager'));
+const RemindersManager = lazyScreen(() => import('./components/organisms/RemindersManager'));
+const InvoiceManager = lazyScreen(() => import('./components/organisms/InvoiceManager'));
+const CreditNoteManager = lazyScreen(() => import('./components/organisms/CreditNoteManager'));
+const AccountsReceivable = lazyScreen(() => import('./components/organisms/AccountsReceivable'));
+const BillingDashboard = lazyScreen(() => import('./components/organisms/BillingDashboard'));
+const CompanyConfigPage = lazyScreen(() => import('./components/organisms/CompanyConfig'));
+const UserManager = lazyScreen(() => import('./components/organisms/UserManager'));
+const UsabilityTest = lazyScreen(() => import('./components/organisms/UsabilityTest'));
 
 type AuthState = { user: AuthUser; token: string } | null;
 
@@ -79,6 +95,14 @@ export default function App() {
       .then(response => setConfigComplete(response.data.estado.puedeEmitir))
       .catch(() => setConfigComplete(false));
   }, [auth?.token, auth?.user.role]);
+
+  // Tras entrar, las pantallas se bajan en segundo plano para que abrirlas no espere la descarga.
+  useEffect(() => {
+    if (!auth) return;
+    sessionStorage.removeItem('factux-chunk-reload');
+    const timer = setTimeout(() => screenImports.forEach(load => void load().catch(() => undefined)), 1500);
+    return () => clearTimeout(timer);
+  }, [auth?.user.id]);
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -188,6 +212,7 @@ export default function App() {
 
       <main className="flex-1 min-w-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+          <Suspense fallback={<div className="py-10 text-center text-sm text-[#6e7681]">Cargando...</div>}>
           {canView('dashboard') && (
             <DashboardPage
               userRole={role}
@@ -253,6 +278,7 @@ export default function App() {
               <div className="text-sm text-[#6e7681]">No tienes permisos para ver esta sección.</div>
             </div>
           )}
+          </Suspense>
         </div>
       </main>
       </div>

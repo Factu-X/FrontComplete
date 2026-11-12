@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -90,7 +90,11 @@ export default function CustomerManager({ addToast, session }: Props) {
 
   const activePlates = customers.flatMap(c => c.motorcycles.filter(m => m.active).map(m => m.plate));
 
+  // Solo la ultima busqueda pinta resultados: una respuesta vieja que llegue tarde se descarta.
+  const latestLoad = useRef(0);
+
   async function loadCustomers() {
+    const loadId = ++latestLoad.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -101,14 +105,8 @@ export default function CustomerManager({ addToast, session }: Props) {
         session,
       );
 
-      // shortcut: una request de motos por cliente; agregar include en GET /clientes si la lista crece.
-      const hydrated = await Promise.all(response.data.map(async customer => {
-        const motos = await apiRequest<ApiListResponse<BackendMotocicleta>>(
-          `/clientes/${customer.id}/motocicletas`,
-          session,
-        );
-        return mapCustomer(customer, motos.data.map(mapMoto));
-      }));
+      if (loadId !== latestLoad.current) return;
+      const hydrated = response.data.map(customer => mapCustomer(customer, (customer.motocicletas ?? []).map(mapMoto)));
 
       setCustomers(hydrated);
       if (detailCustomer) {
@@ -117,12 +115,14 @@ export default function CustomerManager({ addToast, session }: Props) {
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudieron cargar clientes', type: 'error' });
     } finally {
-      setLoading(false);
+      if (loadId === latestLoad.current) setLoading(false);
     }
   }
 
+  // Espera 300 ms a que el usuario deje de escribir antes de consultar.
   useEffect(() => {
-    void loadCustomers();
+    const timer = setTimeout(() => void loadCustomers(), search ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [session.token, search]);
 
   const filtered = customers.filter(c => {
@@ -171,21 +171,25 @@ export default function CustomerManager({ addToast, session }: Props) {
         activo: true,
       };
 
+      // Pinta al instante lo que devolvio el backend; la recarga en segundo plano ajusta orden y filtros.
       if (editingCustomer) {
-        await apiRequest<ApiEntityResponse<BackendCliente>>(`/clientes/${editingCustomer.id}`, session, {
+        const response = await apiRequest<ApiEntityResponse<BackendCliente>>(`/clientes/${editingCustomer.id}`, session, {
           method: 'PATCH',
           body: JSON.stringify(payload),
         });
+        const saved = mapCustomer(response.data, editingCustomer.motorcycles);
+        setCustomers(prev => prev.map(c => (c.id === saved.id ? saved : c)));
         addToast({ message: 'Cliente actualizado correctamente', type: 'success' });
       } else {
-        await apiRequest<ApiEntityResponse<BackendCliente>>('/clientes', session, {
+        const response = await apiRequest<ApiEntityResponse<BackendCliente>>('/clientes', session, {
           method: 'POST',
           body: JSON.stringify(payload),
         });
+        setCustomers(prev => [mapCustomer(response.data, []), ...prev]);
         addToast({ message: 'Cliente registrado exitosamente', type: 'success' });
       }
       setModalOpen(false);
-      await loadCustomers();
+      void loadCustomers();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar el cliente', type: 'error' });
     } finally {
@@ -243,7 +247,7 @@ export default function CustomerManager({ addToast, session }: Props) {
         addToast({ message: `Motocicleta ${response.data.placa} registrada`, type: 'success' });
       }
       setMotoModal(false);
-      await loadCustomers();
+      void loadCustomers();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo guardar la motocicleta', type: 'error' });
     } finally {
@@ -261,7 +265,7 @@ export default function CustomerManager({ addToast, session }: Props) {
       });
       addToast({ message: `Motocicleta ${moto.plate} desactivada`, type: 'warning' });
       setDeleteConfirm(null);
-      await loadCustomers();
+      void loadCustomers();
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo desactivar la motocicleta', type: 'error' });
     }

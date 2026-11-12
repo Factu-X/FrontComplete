@@ -30,14 +30,11 @@ export default function OrderForm({ session, addToast, onCreated, onCancel }: Pr
       .catch(() => addToast({ message: 'No se pudieron cargar los clientes', type: 'error' }));
   }, [session.token]);
 
+  // Las motos ya vienen con cada cliente: elegir cliente no espera otra peticion.
   useEffect(() => {
     setMotorcycleId('');
-    setMotorcycles([]);
-    if (!customerId) return;
-    apiRequest<ApiListResponse<BackendMotocicleta>>(`/clientes/${customerId}/motocicletas`, session)
-      .then(response => setMotorcycles(response.data.filter(m => m.activa)))
-      .catch(() => addToast({ message: 'No se pudieron cargar las motocicletas', type: 'error' }));
-  }, [customerId]);
+    setMotorcycles(customers.find(c => c.id === customerId)?.motocicletas?.filter(m => m.activa) ?? []);
+  }, [customerId, customers]);
 
   function selectMotorcycle(id: string) {
     setMotorcycleId(id);

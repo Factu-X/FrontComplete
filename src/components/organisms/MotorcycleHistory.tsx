@@ -37,15 +37,12 @@ export default function MotorcycleHistory({ motorcycle, customerName, session, a
   useEffect(() => {
     void (async () => {
       try {
-        const response = await apiRequest<ApiListResponse<BackendOrden>>(
+        // El backend incluye los items de cada orden cuando se filtra por moto.
+        const response = await apiRequest<ApiListResponse<BackendOrden & { detallesOrdens: BackendDetalleOrden[] }>>(
           `/ordenes?motocicletaId=${motorcycle.id}`,
           session,
         );
-        // shortcut: una request de detalles por orden; el historial de una moto suele ser corto.
-        const withItems = await Promise.all(response.data.map(async orden => {
-          const detalles = await apiRequest<ApiListResponse<BackendDetalleOrden>>(`/ordenes/${orden.id}/detalles`, session);
-          return { ...orden, items: detalles.data };
-        }));
+        const withItems = response.data.map(({ detallesOrdens, ...orden }) => ({ ...orden, items: detallesOrdens }));
         setOrders(withItems);
       } catch (error) {
         addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar el historial', type: 'error' });
