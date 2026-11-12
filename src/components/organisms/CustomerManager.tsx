@@ -122,7 +122,7 @@ export default function CustomerManager({ addToast, session }: Props) {
   }
 
   useEffect(() => {
-    loadCustomers();
+    void loadCustomers();
   }, [session.token, search]);
 
   const filtered = customers.filter(c => {

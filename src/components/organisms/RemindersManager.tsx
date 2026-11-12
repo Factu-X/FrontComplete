@@ -367,8 +367,9 @@ function ReminderForm({ form, setForm, errors, motoOptions, fixedMoto }: Reminde
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Motocicleta *</label>
+        <label htmlFor="reminder-motorcycle" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Motocicleta *</label>
         <select
+          id="reminder-motorcycle"
           value={form.motorcycleId}
           onChange={e => setForm((f: typeof form) => ({ ...f, motorcycleId: Number(e.target.value) || '' }))}
           disabled={fixedMoto}
@@ -423,8 +424,9 @@ function ReminderForm({ form, setForm, errors, motoOptions, fixedMoto }: Reminde
       )}
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Observaciones</label>
+        <label htmlFor="reminder-observations" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Observaciones</label>
         <textarea
+          id="reminder-observations"
           value={form.observations}
           onChange={e => setForm((f: typeof form) => ({ ...f, observations: e.target.value }))}
           rows={2}

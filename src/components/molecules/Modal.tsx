@@ -34,7 +34,7 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <button type="button" tabIndex={-1} aria-label="Cerrar" className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-default" onClick={onClose} />
       {/* En celular ocupa toda la pantalla; desde sm es una ventana centrada con el ancho pedido. */}
       <div className={`relative w-full ${width} bg-[#161b22] sm:border border-[#30363d] sm:rounded-[8px] shadow-2xl flex flex-col h-dvh sm:h-auto sm:max-h-[90dvh]`}>
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[#30363d]">

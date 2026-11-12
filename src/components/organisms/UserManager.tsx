@@ -78,7 +78,7 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
   }
 
   useEffect(() => {
-    loadUsers();
+    void loadUsers();
   }, [session.token]);
 
   const filtered = users.filter(u => {
@@ -104,7 +104,7 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
     const e: Record<string, string> = {};
     if (form.name.trim().length < 2) e.name = 'El nombre es obligatorio';
     if (!form.email.trim()) e.email = 'El correo es obligatorio';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Correo inválido';
+    else if (!/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(form.email.trim())) e.email = 'Correo inválido';
     else if (users.find(u => u.email === form.email.trim() && u.id !== editingUser?.id)) e.email = 'Este correo ya está registrado';
     if (!editingUser) {
       if (!form.password) e.password = 'La contraseña es obligatoria';

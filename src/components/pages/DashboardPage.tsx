@@ -73,9 +73,10 @@ export default function DashboardPage({ userRole, userName, onNavigate, session 
 
       {/* Open orders alert */}
       {openOrders.length > 0 && (
-        <div
+        <button
+          type="button"
           onClick={() => onNavigate('orders')}
-          className="flex items-center gap-3 px-4 py-3 bg-[#f97316]/10 border border-[#f97316]/25 rounded-[6px] cursor-pointer hover:bg-[#f97316]/15 transition-colors"
+          className="w-full text-left flex items-center gap-3 px-4 py-3 bg-[#f97316]/10 border border-[#f97316]/25 rounded-[6px] cursor-pointer hover:bg-[#f97316]/15 transition-colors"
         >
           <span className="text-[#f97316] text-lg">⚠</span>
           <div className="flex-1">
@@ -83,7 +84,7 @@ export default function DashboardPage({ userRole, userName, onNavigate, session 
             <span className="text-sm text-[#8b949e] ml-2">pendiente{openOrders.length > 1 ? 's' : ''} de atención</span>
           </div>
           <span className="text-xs text-[#f97316]">Ver órdenes →</span>
-        </div>
+        </button>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

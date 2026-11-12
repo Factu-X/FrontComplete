@@ -370,9 +370,9 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
                   : <span className="text-[#6e7681]">Sin certificado. Se necesita para firmar y transmitir (HU-07).</span>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                <label className="flex flex-col gap-1 text-xs text-[#8b949e]">
+                <label htmlFor="certificate-file" className="flex flex-col gap-1 text-xs text-[#8b949e]">
                   <span className="font-medium uppercase tracking-wider">Archivo .p12 / .pfx</span>
-                  <input type="file" accept=".p12,.pfx" onChange={e => pickCertificate(e.target.files?.[0])} className="text-xs text-[#e6edf3]" />
+                  <input id="certificate-file" type="file" accept=".p12,.pfx" onChange={e => pickCertificate(e.target.files?.[0])} className="text-xs text-[#e6edf3]" />
                 </label>
                 <Input label="Contraseña" type="password" autoComplete="new-password" value={cert.password} onChange={e => setCert(c => ({ ...c, password: e.target.value }))} />
                 <Input label="Fecha de vencimiento" type="date" value={cert.expira} onChange={e => setCert(c => ({ ...c, expira: e.target.value }))} />
