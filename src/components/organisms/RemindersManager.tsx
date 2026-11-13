@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -8,246 +8,267 @@ import DataTable from '../molecules/DataTable';
 import SearchBar from '../molecules/SearchBar';
 import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
-import { Reminder, ReminderStatus, ReminderTrigger, Customer } from '../../types';
-
-const MAINTENANCE_TYPES = [
-  'Cambio de aceite',
-  'Afinación general',
-  'Revisión de frenos',
-  'Cambio de llantas',
-  'Cambio de cadena y piñones',
-  'Revisión de suspensión',
-  'Cambio de filtro de aire',
-  'Revisión eléctrica',
-  'Mantenimiento preventivo',
-  'Otro',
-];
-
-const triggerOptions = [
-  { value: 'date', label: 'Por fecha' },
-  { value: 'km', label: 'Por kilometraje' },
-  { value: 'both', label: 'Fecha y kilometraje' },
-];
-
-const STATUS_MAP: Record<ReminderStatus, { badge: 'active' | 'inactive' | 'warning'; label: string }> = {
-  pending: { badge: 'warning', label: 'Pendiente' },
-  completed: { badge: 'active', label: 'Completado' },
-  cancelled: { badge: 'inactive', label: 'Cancelado' },
-};
-
-function isOverdue(r: Reminder): boolean {
-  if (r.status !== 'pending') return false;
-  if (r.scheduledDate && new Date(r.scheduledDate) < new Date()) return true;
-  return false;
-}
-
-const emptyForm = {
-  motorcycleId: '' as number | '',
-  maintenanceType: 'Cambio de aceite',
-  customMaintenanceType: '',
-  triggerType: 'date' as ReminderTrigger,
-  scheduledDate: '',
-  scheduledKm: '' as number | '',
-  observations: '',
-};
+import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
+import {
+  ESTADO_BADGE, MAINTENANCE_TYPES, TRIGGER_OPTIONS, emptyReminderForm, formatFecha, nextReminderForm,
+  toRecordatorioPayload, validateReminderForm, type ReminderForm, type ReminderTrigger,
+} from '../../lib/reminders';
+import type {
+  BackendCliente, BackendRecordatorio, ResultadoNotificacion, ResumenNotificaciones,
+} from '../../lib/types';
 
 interface Props {
-  reminders: Reminder[];
-  setReminders: React.Dispatch<React.SetStateAction<Reminder[]>>;
-  customers: Customer[];
+  session: ApiSession;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  // Avisa a la app para que actualice el número junto a "Recordatorios" en el menú.
+  onChanged?: () => void;
 }
 
-export default function RemindersManager({ reminders, setReminders, customers, addToast }: Props) {
+type MotoOption = { id: string; label: string };
+
+export default function RemindersManager({ session, addToast, onChanged }: Props) {
+  const [reminders, setReminders] = useState<BackendRecordatorio[]>([]);
+  const [motos, setMotos] = useState<MotoOption[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<ReminderForm>(emptyReminderForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<{ reminder: Reminder; action: 'complete' | 'cancel' } | null>(null);
-  const [nextReminderModal, setNextReminderModal] = useState<Reminder | null>(null);
-  const [nextForm, setNextForm] = useState(emptyForm);
+  const [confirmAction, setConfirmAction] = useState<{ reminder: BackendRecordatorio; action: 'complete' | 'cancel' } | null>(null);
+  const [nextReminderModal, setNextReminderModal] = useState<BackendRecordatorio | null>(null);
+  const [nextForm, setNextForm] = useState<ReminderForm>(emptyReminderForm());
   const [nextErrors, setNextErrors] = useState<Record<string, string>>({});
-  const [nextSaving, setNextSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notifyingAll, setNotifyingAll] = useState(false);
 
-  // All motorcycles with owner info
-  const allMotos = useMemo(() =>
-    customers.flatMap(c => c.motorcycles.map(m => ({ ...m, customerId: c.id, customerName: c.name, customerEmail: c.email }))),
-    [customers]
-  );
+  const fail = (error: unknown, fallback: string) =>
+    addToast({ message: error instanceof Error ? error.message : fallback, type: 'error' });
 
-  const motoOptions = [
-    { value: '', label: 'Seleccionar motocicleta...' },
-    ...allMotos.map(m => ({ value: String(m.id), label: `${m.plate} — ${m.brand} ${m.model} (${m.customerName})` })),
-  ];
+  async function load() {
+    try {
+      const response = await apiRequest<ApiListResponse<BackendRecordatorio>>('/recordatorios', session);
+      setReminders(response.data);
+    } catch (error) {
+      fail(error, 'No se pudieron cargar los recordatorios');
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const overdueCount = reminders.filter(isOverdue).length;
+  async function loadMotos() {
+    try {
+      const response = await apiRequest<ApiListResponse<BackendCliente>>('/clientes', session);
+      setMotos(response.data.flatMap(c => (c.motocicletas ?? [])
+        .filter(m => m.activa)
+        .map(m => ({ id: m.id, label: `${m.placa} — ${m.marca} ${m.modelo} (${c.nombreRazonSocial})` }))));
+    } catch (error) {
+      fail(error, 'No se pudieron cargar las motocicletas');
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    void loadMotos();
+  }, [session.token]);
+
+  async function refresh() {
+    await load();
+    onChanged?.();
+  }
+
+  const motoOptions = [{ value: '', label: 'Seleccionar motocicleta...' }, ...motos.map(m => ({ value: m.id, label: m.label }))];
+
+  const overdueCount = reminders.filter(r => r.vencido).length;
 
   const filtered = useMemo(() => reminders.filter(r => {
     const q = search.toLowerCase();
-    const matchQ = !q || r.motorcyclePlate.toLowerCase().includes(q)
-      || r.customerName.toLowerCase().includes(q)
-      || r.maintenanceType.toLowerCase().includes(q);
-    const matchS = filterStatus === 'all' || r.status === filterStatus
-      || (filterStatus === 'overdue' && isOverdue(r));
+    const matchQ = !q
+      || (r.motocicleta?.placa.toLowerCase().includes(q) ?? false)
+      || (r.motocicleta?.cliente?.nombreRazonSocial.toLowerCase().includes(q) ?? false)
+      || r.tipoMantenimiento.toLowerCase().includes(q);
+    const matchS = filterStatus === 'all'
+      || (filterStatus === 'overdue' ? r.vencido : r.estado === filterStatus);
     return matchQ && matchS;
-  }).sort((a, b) => {
-    // Overdue first, then by date
-    if (isOverdue(a) && !isOverdue(b)) return -1;
-    if (!isOverdue(a) && isOverdue(b)) return 1;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   }), [reminders, search, filterStatus]);
 
-  function validate(f: typeof emptyForm) {
-    const e: Record<string, string> = {};
-    if (!f.motorcycleId) e.motorcycleId = 'Selecciona una motocicleta';
-    if (f.maintenanceType === 'Otro' && !f.customMaintenanceType.trim()) e.customMaintenanceType = 'Escribe el tipo de mantenimiento';
-    if ((f.triggerType === 'date' || f.triggerType === 'both') && !f.scheduledDate) e.scheduledDate = 'La fecha es obligatoria';
-    if ((f.triggerType === 'km' || f.triggerType === 'both') && (!f.scheduledKm || Number(f.scheduledKm) <= 0)) e.scheduledKm = 'El kilometraje debe ser mayor a 0';
-    return e;
-  }
-
-  function handleCreate() {
-    const e = validate(form);
+  async function handleCreate() {
+    const e = validateReminderForm(form);
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
-    setTimeout(() => {
-      const moto = allMotos.find(m => m.id === Number(form.motorcycleId))!;
-      const newR: Reminder = {
-        id: Date.now(),
-        motorcycleId: moto.id,
-        motorcyclePlate: moto.plate,
-        motorcycleBrand: moto.brand,
-        motorcycleModel: moto.model,
-        customerId: moto.customerId,
-        customerName: moto.customerName,
-        customerEmail: moto.customerEmail,
-        maintenanceType: form.maintenanceType === 'Otro' ? form.customMaintenanceType : form.maintenanceType,
-        triggerType: form.triggerType,
-        scheduledDate: form.scheduledDate || undefined,
-        scheduledKm: form.scheduledKm ? Number(form.scheduledKm) : undefined,
-        observations: form.observations,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        notificationSent: false,
-      };
-      setReminders(prev => [newR, ...prev]);
-      addToast({ message: `Recordatorio creado para ${moto.plate}`, type: 'success' });
-      setSaving(false);
+    try {
+      const response = await apiRequest<ApiEntityResponse<BackendRecordatorio>>('/recordatorios', session, {
+        method: 'POST',
+        body: JSON.stringify(toRecordatorioPayload(form)),
+      });
+      addToast({ message: `Recordatorio creado para ${response.data.motocicleta?.placa ?? 'la motocicleta'}`, type: 'success' });
       setModalOpen(false);
-      setForm(emptyForm);
-    }, 500);
+      setForm(emptyReminderForm());
+      await refresh();
+    } catch (error) {
+      fail(error, 'No se pudo crear el recordatorio');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleAction() {
+  async function handleAction() {
     if (!confirmAction) return;
     const { reminder, action } = confirmAction;
-    setReminders(prev => prev.map(r => r.id === reminder.id
-      ? { ...r, status: action === 'complete' ? 'completed' : 'cancelled', completedAt: new Date().toISOString() }
-      : r
-    ));
-    addToast({ message: action === 'complete' ? 'Recordatorio marcado como completado' : 'Recordatorio cancelado', type: action === 'complete' ? 'success' : 'warning' });
-    if (action === 'complete') {
-      // Open "next reminder" flow
-      const moto = allMotos.find(m => m.id === reminder.motorcycleId);
-      if (moto) {
+    setBusyId(reminder.id);
+    try {
+      await apiRequest(`/recordatorios/${reminder.id}/estado`, session, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: action === 'complete' ? 'COMPLETADO' : 'CANCELADO' }),
+      });
+      addToast({
+        message: action === 'complete' ? 'Recordatorio marcado como completado' : 'Recordatorio cancelado',
+        type: action === 'complete' ? 'success' : 'warning',
+      });
+      setConfirmAction(null);
+      await refresh();
+      if (action === 'complete') {
         setNextReminderModal(reminder);
-        setNextForm({ ...emptyForm, motorcycleId: moto.id, maintenanceType: reminder.maintenanceType, triggerType: reminder.triggerType });
+        setNextForm(nextReminderForm(reminder));
         setNextErrors({});
       }
+    } catch (error) {
+      fail(error, 'No se pudo actualizar el recordatorio');
+    } finally {
+      setBusyId(null);
     }
-    setConfirmAction(null);
   }
 
-  function handleSimulateNotification(r: Reminder) {
-    if (!r.customerEmail) {
-      addToast({ message: 'Cliente sin correo registrado. Recordatorio conservado como pendiente.', type: 'warning' });
-      return;
+  async function handleReopen(reminder: BackendRecordatorio) {
+    setBusyId(reminder.id);
+    try {
+      await apiRequest(`/recordatorios/${reminder.id}/estado`, session, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: 'PENDIENTE' }),
+      });
+      addToast({ message: 'Recordatorio vuelto a pendiente', type: 'success' });
+      await refresh();
+    } catch (error) {
+      fail(error, 'No se pudo reabrir el recordatorio');
+    } finally {
+      setBusyId(null);
     }
-    setReminders(prev => prev.map(x => x.id === r.id ? { ...x, notificationSent: true } : x));
-    addToast({ message: `Notificación enviada a ${r.customerEmail}`, type: 'success' });
   }
 
-  function handleCreateNext() {
-    const e = validate(nextForm);
+  async function handleNotify(reminder: BackendRecordatorio) {
+    setBusyId(reminder.id);
+    try {
+      const response = await apiRequest<ApiEntityResponse<ResultadoNotificacion>>(`/recordatorios/${reminder.id}/notificar`, session, { method: 'POST' });
+      if (response.data.resultado === 'ENVIADO') {
+        addToast({ message: `Notificación enviada a ${reminder.motocicleta?.cliente?.email ?? 'el cliente'}`, type: 'success' });
+      } else {
+        addToast({ message: 'El cliente no tiene correo registrado. El recordatorio sigue pendiente.', type: 'warning' });
+      }
+      await refresh();
+    } catch (error) {
+      fail(error, 'No se pudo enviar la notificación');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleNotifyAll() {
+    setNotifyingAll(true);
+    try {
+      const response = await apiRequest<ApiEntityResponse<ResumenNotificaciones>>('/recordatorios/notificar', session, { method: 'POST' });
+      const { enviados, sinCorreo, fallidos, revisados } = response.data;
+      addToast({
+        message: revisados === 0
+          ? 'No hay vencidos por notificar.'
+          : `Enviadas: ${enviados}. Sin correo: ${sinCorreo}. Fallidas: ${fallidos}.`,
+        type: fallidos > 0 ? 'warning' : 'success',
+      });
+      await refresh();
+    } catch (error) {
+      fail(error, 'No se pudieron enviar las notificaciones');
+    } finally {
+      setNotifyingAll(false);
+    }
+  }
+
+  async function handleCreateNext() {
+    const e = validateReminderForm(nextForm);
     if (Object.keys(e).length) { setNextErrors(e); return; }
-    setNextSaving(true);
-    setTimeout(() => {
-      const moto = allMotos.find(m => m.id === Number(nextForm.motorcycleId))!;
-      const newR: Reminder = {
-        id: Date.now(),
-        motorcycleId: moto.id,
-        motorcyclePlate: moto.plate,
-        motorcycleBrand: moto.brand,
-        motorcycleModel: moto.model,
-        customerId: moto.customerId,
-        customerName: moto.customerName,
-        customerEmail: moto.customerEmail,
-        maintenanceType: nextForm.maintenanceType === 'Otro' ? nextForm.customMaintenanceType : nextForm.maintenanceType,
-        triggerType: nextForm.triggerType,
-        scheduledDate: nextForm.scheduledDate || undefined,
-        scheduledKm: nextForm.scheduledKm ? Number(nextForm.scheduledKm) : undefined,
-        observations: nextForm.observations,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        notificationSent: false,
-      };
-      setReminders(prev => [newR, ...prev]);
-      addToast({ message: `Próximo recordatorio programado para ${moto.plate}`, type: 'success' });
-      setNextSaving(false);
+    setSaving(true);
+    try {
+      await apiRequest('/recordatorios', session, {
+        method: 'POST',
+        body: JSON.stringify({ ...toRecordatorioPayload(nextForm), ordenOrigenId: nextReminderModal?.ordenOrigenId ?? null }),
+      });
+      addToast({ message: 'Próximo recordatorio programado', type: 'success' });
       setNextReminderModal(null);
-    }, 500);
+      await refresh();
+    } catch (error) {
+      fail(error, 'No se pudo programar el próximo recordatorio');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const columns = [
-    { key: 'moto', header: 'Motocicleta / Cliente', render: (r: Reminder) => (
+    { key: 'moto', header: 'Motocicleta / Cliente', render: (r: BackendRecordatorio) => (
       <div>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-bold text-[#f97316]">{r.motorcyclePlate}</span>
-          <span className="text-xs text-[#8b949e]">{r.motorcycleBrand} {r.motorcycleModel}</span>
-          {isOverdue(r) && (
+          <span className="font-mono text-xs font-bold text-[#f97316]">{r.motocicleta?.placa}</span>
+          <span className="text-xs text-[#8b949e]">{r.motocicleta?.marca} {r.motocicleta?.modelo}</span>
+          {r.vencido && (
             <span className="text-[10px] font-bold text-red-400 bg-red-400/10 border border-red-400/20 px-1.5 py-0.5 rounded font-mono">VENCIDO</span>
           )}
         </div>
-        <div className="text-xs text-[#6e7681] mt-0.5">{r.customerName}</div>
+        <div className="text-xs text-[#6e7681] mt-0.5">{r.motocicleta?.cliente?.nombreRazonSocial}</div>
       </div>
     )},
-    { key: 'type', header: 'Mantenimiento', render: (r: Reminder) => (
-      <span className="text-sm text-[#e6edf3]">{r.maintenanceType}</span>
+    { key: 'type', header: 'Mantenimiento', render: (r: BackendRecordatorio) => (
+      <div>
+        <span className="text-sm text-[#e6edf3]">{r.tipoMantenimiento}</span>
+        {r.descripcion && <div className="text-xs text-[#6e7681] mt-0.5 max-w-xs truncate" title={r.descripcion}>{r.descripcion}</div>}
+      </div>
     )},
-    { key: 'trigger', header: 'Programado', render: (r: Reminder) => (
+    { key: 'trigger', header: 'Programado', render: (r: BackendRecordatorio) => (
       <div className="text-xs space-y-0.5">
-        {r.scheduledDate && (
-          <div className={`font-mono ${isOverdue(r) ? 'text-red-400' : 'text-[#8b949e]'}`}>
-            📅 {new Date(r.scheduledDate + 'T00:00:00').toLocaleDateString('es-CO')}
+        {r.fechaObjetivo && (
+          <div className={`font-mono ${r.vencidoPorFecha ? 'text-red-400' : 'text-[#8b949e]'}`}>
+            📅 {formatFecha(r.fechaObjetivo)}
           </div>
         )}
-        {r.scheduledKm && (
-          <div className="font-mono text-[#8b949e]">⊙ {r.scheduledKm.toLocaleString('es-CO')} km</div>
+        {r.kilometrajeObjetivo !== null && (
+          <div className={`font-mono ${r.vencidoPorKm ? 'text-red-400' : 'text-[#8b949e]'}`}>
+            ⊙ {r.kilometrajeObjetivo.toLocaleString('es-CO')} km
+            {r.motocicleta?.kilometrajeActual != null && (
+              <span className="text-[#6e7681]"> (actual {r.motocicleta.kilometrajeActual.toLocaleString('es-CO')})</span>
+            )}
+          </div>
         )}
       </div>
     )},
-    { key: 'status', header: 'Estado', render: (r: Reminder) => (
-      <Badge variant={STATUS_MAP[r.status].badge}>{STATUS_MAP[r.status].label}</Badge>
+    { key: 'status', header: 'Estado', render: (r: BackendRecordatorio) => (
+      <Badge variant={ESTADO_BADGE[r.estado].badge}>{ESTADO_BADGE[r.estado].label}</Badge>
     )},
-    { key: 'notif', header: 'Notif.', render: (r: Reminder) => (
-      r.status === 'pending' ? (
-        <span className={`text-xs font-mono ${r.notificationSent ? 'text-emerald-400' : 'text-[#6e7681]'}`}>
-          {r.notificationSent ? '✓ Enviada' : '— Pendiente'}
+    { key: 'notif', header: 'Notif.', render: (r: BackendRecordatorio) => (
+      r.estado === 'PENDIENTE' ? (
+        <span className={`text-xs font-mono ${r.notificacionEnviadaAt ? 'text-emerald-400' : 'text-[#6e7681]'}`}>
+          {r.notificacionEnviadaAt ? '✓ Enviada' : '— Pendiente'}
         </span>
       ) : <span className="text-xs text-[#6e7681]">—</span>
     )},
-    { key: 'actions', header: '', render: (r: Reminder) => (
+    { key: 'actions', header: '', render: (r: BackendRecordatorio) => (
       <div className="flex gap-1 justify-end flex-wrap">
-        {r.status === 'pending' && (
+        {r.estado === 'PENDIENTE' ? (
           <>
-            {!r.notificationSent && (
-              <Button size="sm" variant="ghost" onClick={() => handleSimulateNotification(r)}>Notificar</Button>
+            {!r.notificacionEnviadaAt && (
+              <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => void handleNotify(r)}>Notificar</Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setConfirmAction({ reminder: r, action: 'complete' })}>Completar</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirmAction({ reminder: r, action: 'cancel' })}>Cancelar</Button>
+            <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => setConfirmAction({ reminder: r, action: 'complete' })}>Completar</Button>
+            <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => setConfirmAction({ reminder: r, action: 'cancel' })}>Cancelar</Button>
           </>
+        ) : (
+          <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => void handleReopen(r)}>Reabrir</Button>
         )}
       </div>
     )},
@@ -260,18 +281,22 @@ export default function RemindersManager({ reminders, setReminders, customers, a
           <h1 className="text-xl font-bold text-[#e6edf3]">Recordatorios de Mantenimiento</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">HU-11 · Seguimiento y alertas de servicios programados</p>
         </div>
-        <Button onClick={() => { setForm(emptyForm); setErrors({}); setModalOpen(true); }} icon={<span className="text-base">+</span>}>
-          Nuevo recordatorio
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" disabled={notifyingAll || overdueCount === 0} onClick={() => void handleNotifyAll()}>
+            {notifyingAll ? 'Enviando...' : 'Notificar vencidos'}
+          </Button>
+          <Button onClick={() => { setForm(emptyReminderForm()); setErrors({}); setModalOpen(true); }} icon={<span className="text-base">+</span>}>
+            Nuevo recordatorio
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Total', value: reminders.length, color: 'text-[#e6edf3]' },
-          { label: 'Pendientes', value: reminders.filter(r => r.status === 'pending').length, color: 'text-yellow-400' },
+          { label: 'Pendientes', value: reminders.filter(r => r.estado === 'PENDIENTE').length, color: 'text-yellow-400' },
           { label: 'Vencidos', value: overdueCount, color: overdueCount > 0 ? 'text-red-400' : 'text-[#6e7681]' },
-          { label: 'Completados', value: reminders.filter(r => r.status === 'completed').length, color: 'text-emerald-400' },
+          { label: 'Completados', value: reminders.filter(r => r.estado === 'COMPLETADO').length, color: 'text-emerald-400' },
         ].map(s => (
           <div key={s.label} className="bg-[#161b22] border border-[#30363d] rounded-[6px] px-4 py-3">
             <div className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</div>
@@ -283,7 +308,9 @@ export default function RemindersManager({ reminders, setReminders, customers, a
       {overdueCount > 0 && (
         <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-[6px]">
           <span className="text-red-400 text-lg">⚠</span>
-          <span className="text-sm text-red-300 font-medium">{overdueCount} recordatorio{overdueCount > 1 ? 's' : ''} ha{overdueCount > 1 ? 'n' : ''} superado la fecha estimada.</span>
+          <span className="text-sm text-red-300 font-medium">
+            {overdueCount} recordatorio{overdueCount > 1 ? 's han' : ' ha'} alcanzado su fecha o kilometraje estimado.
+          </span>
           <button onClick={() => setFilterStatus('overdue')} className="ml-auto text-xs text-red-400 hover:underline">Ver vencidos</button>
         </div>
       )}
@@ -293,75 +320,62 @@ export default function RemindersManager({ reminders, setReminders, customers, a
           <SearchBar value={search} onChange={setSearch} placeholder="Buscar por placa, cliente o tipo..." />
         </div>
         <div className="flex max-w-full overflow-x-auto rounded-[6px] border border-[#30363d] text-xs">
-          {[['all','Todos'],['pending','Pendientes'],['overdue','Vencidos'],['completed','Completados'],['cancelled','Cancelados']].map(([v,l]) => (
-            <button key={v} onClick={() => setFilterStatus(v)}
+          {[['all', 'Todos'], ['PENDIENTE', 'Pendientes'], ['overdue', 'Vencidos'], ['COMPLETADO', 'Completados'], ['CANCELADO', 'Cancelados']].map(([v, l]) => (
+            <button key={v} onClick={() => setFilterStatus(v as string)}
               className={`whitespace-nowrap px-3 py-2 transition-colors ${filterStatus === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
             >{l}</button>
           ))}
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage="No se encontraron recordatorios" />
+      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando recordatorios...' : 'No se encontraron recordatorios'} />
 
-      {/* Create Modal */}
-      <Modal title="Nuevo recordatorio de mantenimiento" open={modalOpen} onClose={() => setModalOpen(false)} onConfirm={handleCreate} loading={saving} width="max-w-lg">
-        <ReminderForm form={form} setForm={setForm} errors={errors} motoOptions={motoOptions} />
+      <Modal title="Nuevo recordatorio de mantenimiento" open={modalOpen} onClose={() => setModalOpen(false)} onConfirm={() => void handleCreate()} loading={saving} width="max-w-lg">
+        <ReminderFormFields form={form} setForm={setForm} errors={errors} motoOptions={motoOptions} />
       </Modal>
 
-      {/* Next Reminder Modal */}
       <Modal
         title="Programar próximo mantenimiento"
         open={!!nextReminderModal}
         onClose={() => setNextReminderModal(null)}
-        onConfirm={handleCreateNext}
-        loading={nextSaving}
+        onConfirm={() => void handleCreateNext()}
+        loading={saving}
         confirmLabel="Programar próximo"
         width="max-w-lg"
       >
         <div className="mb-4 px-3 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs text-emerald-300">
-          ✓ Mantenimiento "{nextReminderModal?.maintenanceType}" completado. Configura el próximo recordatorio.
+          ✓ Mantenimiento "{nextReminderModal?.tipoMantenimiento}" completado. Configura el próximo recordatorio o cierra esta ventana para omitirlo.
         </div>
-        <ReminderForm form={nextForm} setForm={setNextForm} errors={nextErrors} motoOptions={motoOptions} fixedMoto />
+        <ReminderFormFields form={nextForm} setForm={setNextForm} errors={nextErrors} motoOptions={motoOptions} fixedMoto />
       </Modal>
 
-      {/* Confirm action */}
       <ConfirmDialog
         open={!!confirmAction}
         title={confirmAction?.action === 'complete' ? 'Marcar como completado' : 'Cancelar recordatorio'}
         message={confirmAction?.action === 'complete'
-          ? `¿Confirmar que el mantenimiento "${confirmAction?.reminder.maintenanceType}" fue realizado? Se te ofrecerá programar el próximo recordatorio.`
-          : `¿Cancelar el recordatorio de "${confirmAction?.reminder.maintenanceType}" para ${confirmAction?.reminder.motorcyclePlate}?`
-        }
+          ? `¿Confirmar que el mantenimiento "${confirmAction?.reminder.tipoMantenimiento}" fue realizado? Se te ofrecerá programar el próximo recordatorio.`
+          : `¿Cancelar el recordatorio de "${confirmAction?.reminder.tipoMantenimiento}" para ${confirmAction?.reminder.motocicleta?.placa}?`}
         confirmLabel={confirmAction?.action === 'complete' ? 'Sí, completado' : 'Cancelar recordatorio'}
         destructive={confirmAction?.action === 'cancel'}
-        onConfirm={handleAction}
+        onConfirm={() => void handleAction()}
         onClose={() => setConfirmAction(null)}
       />
     </div>
   );
 }
 
-// ─── Sub-form component ────────────────────────────────────────────────────
+// ─── Campos del formulario ─────────────────────────────────────────────────
 
-interface ReminderFormState {
-  motorcycleId: number | '';
-  maintenanceType: string;
-  customMaintenanceType: string;
-  triggerType: ReminderTrigger;
-  scheduledDate: string;
-  scheduledKm: number | '';
-  observations: string;
-}
-
-interface ReminderFormProps {
-  form: ReminderFormState;
-  setForm: React.Dispatch<React.SetStateAction<ReminderFormState>>;
+interface FieldsProps {
+  form: ReminderForm;
+  setForm: React.Dispatch<React.SetStateAction<ReminderForm>>;
   errors: Record<string, string>;
   motoOptions: { value: string; label: string }[];
   fixedMoto?: boolean;
 }
 
-function ReminderForm({ form, setForm, errors, motoOptions, fixedMoto }: ReminderFormProps) {
+function ReminderFormFields({ form, setForm, errors, motoOptions, fixedMoto }: FieldsProps) {
+  const set = (cambios: Partial<ReminderForm>) => setForm(f => ({ ...f, ...cambios }));
   const mtOptions = MAINTENANCE_TYPES.map(t => ({ value: t, label: t }));
 
   return (
@@ -370,55 +384,39 @@ function ReminderForm({ form, setForm, errors, motoOptions, fixedMoto }: Reminde
         <label htmlFor="reminder-motorcycle" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Motocicleta *</label>
         <select
           id="reminder-motorcycle"
-          value={form.motorcycleId}
-          onChange={e => setForm((f: typeof form) => ({ ...f, motorcycleId: Number(e.target.value) || '' }))}
+          value={form.motocicletaId}
+          onChange={e => set({ motocicletaId: e.target.value })}
           disabled={fixedMoto}
           className="w-full bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] focus:outline-none focus:border-[#f97316] disabled:opacity-60"
         >
           {motoOptions.map(o => <option key={o.value} value={o.value} className="bg-[#161b22]">{o.label}</option>)}
         </select>
-        {errors.motorcycleId && <span className="text-xs text-[#ef4444]">{errors.motorcycleId}</span>}
+        {errors['motocicletaId'] && <span className="text-xs text-[#ef4444]">{errors['motocicletaId']}</span>}
       </div>
 
-      <Select
-        label="Tipo de mantenimiento *"
-        options={mtOptions}
-        value={form.maintenanceType}
-        onChange={e => setForm((f: typeof form) => ({ ...f, maintenanceType: e.target.value }))}
-      />
+      <Select label="Tipo de mantenimiento *" options={mtOptions} value={form.maintenanceType} onChange={e => set({ maintenanceType: e.target.value })} />
       {form.maintenanceType === 'Otro' && (
         <Input
           label="Especifica el tipo *"
           value={form.customMaintenanceType}
-          onChange={e => setForm((f: typeof form) => ({ ...f, customMaintenanceType: e.target.value }))}
-          error={errors.customMaintenanceType}
+          onChange={e => set({ customMaintenanceType: e.target.value })}
+          error={errors['customMaintenanceType']}
           placeholder="Ej: Cambio de amortiguadores"
         />
       )}
 
-      <Select
-        label="Tipo de recordatorio *"
-        options={triggerOptions}
-        value={form.triggerType}
-        onChange={e => setForm((f: typeof form) => ({ ...f, triggerType: e.target.value as ReminderTrigger }))}
-      />
+      <Select label="Tipo de recordatorio *" options={TRIGGER_OPTIONS} value={form.triggerType} onChange={e => set({ triggerType: e.target.value as ReminderTrigger })} />
 
       {(form.triggerType === 'date' || form.triggerType === 'both') && (
-        <Input
-          label="Fecha estimada *"
-          type="date"
-          value={form.scheduledDate}
-          onChange={e => setForm((f: typeof form) => ({ ...f, scheduledDate: e.target.value }))}
-          error={errors.scheduledDate}
-        />
+        <Input label="Fecha estimada *" type="date" value={form.fechaObjetivo} onChange={e => set({ fechaObjetivo: e.target.value })} error={errors['fechaObjetivo']} />
       )}
       {(form.triggerType === 'km' || form.triggerType === 'both') && (
         <Input
           label="Kilometraje estimado *"
           type="number"
-          value={form.scheduledKm}
-          onChange={e => setForm((f: typeof form) => ({ ...f, scheduledKm: Number(e.target.value) || '' }))}
-          error={errors.scheduledKm}
+          value={form.kilometrajeObjetivo}
+          onChange={e => set({ kilometrajeObjetivo: Number(e.target.value) || '' })}
+          error={errors['kilometrajeObjetivo']}
           placeholder="14500"
         />
       )}
@@ -427,9 +425,10 @@ function ReminderForm({ form, setForm, errors, motoOptions, fixedMoto }: Reminde
         <label htmlFor="reminder-observations" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">Observaciones</label>
         <textarea
           id="reminder-observations"
-          value={form.observations}
-          onChange={e => setForm((f: typeof form) => ({ ...f, observations: e.target.value }))}
+          value={form.descripcion}
+          onChange={e => set({ descripcion: e.target.value })}
           rows={2}
+          maxLength={1000}
           placeholder="Notas adicionales sobre el mantenimiento..."
           className="w-full bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] placeholder-[#6e7681] focus:outline-none focus:border-[#f97316] resize-none"
         />

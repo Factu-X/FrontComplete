@@ -3,15 +3,10 @@ import LoginPage from './components/pages/LoginPage';
 import DashboardPage from './components/pages/DashboardPage';
 import Sidebar, { Page, PAGE_LABELS } from './components/organisms/Sidebar';
 import ToastContainer, { ToastItem } from './components/molecules/ToastContainer';
-import DemoNotice from './components/molecules/DemoNotice';
 import { apiRequest, setUnauthorizedHandler } from './lib/api';
 import { supabase } from './lib/supabase';
 import { canAccessPage, ROLE_LABELS, roleFromProfile } from './lib/roles';
-import type { AuthUser, BackendCartera, BackendConfiguracion, BackendProfile } from './lib/types';
-import { Customer, Reminder, UsabilitySession } from './types';
-import {
-  initialCustomers, initialReminders, initialUsabilitySessions,
-} from './data/initialData';
+import type { AuthUser, BackendCartera, BackendConfiguracion, BackendProfile, BackendRecordatorio } from './lib/types';
 
 // Cada pantalla se descarga aparte; login, menu y dashboard van en el paquete inicial.
 const screenImports: Array<() => Promise<unknown>> = [];
@@ -49,14 +44,10 @@ export default function App() {
   const [page, setPage] = useState<Page>('dashboard');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // shortcut: recordatorios (HU-11) y usabilidad (HU-14) siguen con datos de prueba y se marcan con
-  // DemoNotice; conectarlos cuando exista su API. Todo lo demás ya usa la API.
-  const [mockCustomers] = useState<Customer[]>(initialCustomers);
-  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
+  const [pendingReminders, setPendingReminders] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [configComplete, setConfigComplete] = useState(true);
   const [overdueInvoices, setOverdueInvoices] = useState(0);
-  const [usabilitySessions, setUsabilitySessions] = useState<UsabilitySession[]>(initialUsabilitySessions);
 
   const addToast = useCallback((t: Omit<ToastItem, 'id'>) => {
     const id = Date.now();
@@ -87,6 +78,18 @@ export default function App() {
     if (!auth || auth.user.role === 'operator') return;
     refreshOverdue(auth.token);
   }, [auth?.token, auth?.user.role, refreshOverdue]);
+
+  // El número junto a "Recordatorios" son los pendientes reales (HU-11); el operario no ve esa pantalla.
+  const refreshReminders = useCallback((token: string) => {
+    apiRequest<{ data: BackendRecordatorio[] }>('/recordatorios?estado=PENDIENTE', { token })
+      .then(response => setPendingReminders(response.data.length))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!auth || auth.user.role === 'operator') return;
+    refreshReminders(auth.token);
+  }, [auth?.token, auth?.user.role, refreshReminders]);
 
   // El aviso del menú refleja la configuración real (HU-13); el operario no la consulta.
   useEffect(() => {
@@ -178,7 +181,6 @@ export default function App() {
   }
 
   const userName = auth.user.name;
-  const pendingReminderCount = reminders.filter(r => r.status === 'pending').length;
 
   const session = { token: auth.token };
   const role = auth.user.role;
@@ -192,7 +194,7 @@ export default function App() {
         userRole={auth.user.role}
         userName={userName}
         onLogout={handleLogout}
-        reminderCount={pendingReminderCount}
+        reminderCount={pendingReminders}
         configComplete={configComplete}
         pendingReceivables={overdueInvoices}
         open={menuOpen}
@@ -225,15 +227,7 @@ export default function App() {
           {canView('catalog') && <CatalogManager session={session} userRole={role} addToast={addToast} />}
           {canView('customers') && <CustomerManager session={session} addToast={addToast} />}
           {canView('reminders') && (
-            <>
-              <DemoNotice hu="HU-11" />
-              <RemindersManager
-                reminders={reminders}
-                setReminders={setReminders}
-                customers={mockCustomers}
-                addToast={addToast}
-              />
-            </>
+            <RemindersManager session={session} addToast={addToast} onChanged={() => refreshReminders(auth.token)} />
           )}
           {canView('invoices') && (
             <InvoiceManager session={session} addToast={addToast} />
@@ -259,14 +253,7 @@ export default function App() {
             <UserManager addToast={addToast} session={session} currentUserId={auth.user.id} />
           )}
           {canView('usability') && (
-            <>
-              <DemoNotice hu="HU-14" />
-              <UsabilityTest
-                sessions={usabilitySessions}
-                setSessions={setUsabilitySessions}
-                addToast={addToast}
-              />
-            </>
+            <UsabilityTest session={session} addToast={addToast} />
           )}
           {canView('help') && (
             <HelpPage />
