@@ -350,3 +350,83 @@ export type ReporteFacturacion = {
   topClientes: { id: string; nombre: string; documento: string; facturas: number; total: string }[];
   cartera: ResumenCartera;
 };
+
+// ─── Recordatorios de mantenimiento (HU-11) ───────────────────────────────
+
+export type EstadoRecordatorio = 'PENDIENTE' | 'COMPLETADO' | 'CANCELADO';
+
+export type BackendRecordatorio = {
+  id: string;
+  motocicletaId: string;
+  ordenOrigenId: string | null;
+  tipoMantenimiento: string;
+  descripcion: string | null;
+  // YYYY-MM-DD
+  fechaObjetivo: string | null;
+  kilometrajeObjetivo: number | null;
+  estado: EstadoRecordatorio;
+  notificacionEnviadaAt: string | null;
+  completadoAt: string | null;
+  createdAt: string;
+  vencido: boolean;
+  vencidoPorFecha: boolean;
+  vencidoPorKm: boolean;
+  motocicleta: {
+    id: string;
+    placa: string;
+    marca: string;
+    modelo: string;
+    kilometrajeActual: number | null;
+    cliente: { id: string; nombreRazonSocial: string; email: string | null; telefono: string | null } | null;
+  } | null;
+};
+
+export type ResultadoNotificacion = { resultado: 'ENVIADO' | 'SIN_CORREO' };
+export type ResumenNotificaciones = { revisados: number; enviados: number; sinCorreo: number; fallidos: number };
+
+// ─── Pruebas de usabilidad (HU-14) ────────────────────────────────────────
+
+export type PrioridadHallazgo = 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA';
+export type NivelSus = 'EXCELENTE' | 'BUENO' | 'REGULAR' | 'DEFICIENTE';
+
+export type BackendTareaUsabilidad = {
+  id: string;
+  sesionId: string;
+  tarea: string;
+  completada: boolean;
+  errores: number;
+  observaciones: string | null;
+};
+
+export type BackendHallazgoUsabilidad = {
+  id: string;
+  sesionId: string;
+  descripcion: string;
+  pantalla: string | null;
+  prioridad: PrioridadHallazgo;
+  enBacklog: boolean;
+  resuelto: boolean;
+};
+
+export type BackendSesionUsabilidad = {
+  id: string;
+  participante: string;
+  perfil: string | null;
+  fechaSesion: string;
+  observaciones: string | null;
+  susRespuestas: number[];
+  susPuntaje: number;
+  susNivel: NivelSus;
+  tareas: BackendTareaUsabilidad[];
+  hallazgos: BackendHallazgoUsabilidad[];
+  createdAt: string;
+};
+
+export type ResumenUsabilidad = {
+  sesiones: number;
+  sus: { promedio: number | null; minimo: number | null; maximo: number | null; nivel: NivelSus | null; referencia: number };
+  tareas: { tasaExito: number; erroresTotales: number };
+  hallazgos: { total: number; porPrioridad: Record<PrioridadHallazgo, number>; criticosPendientes: number; enBacklog: number };
+};
+
+export type TareasBaseUsabilidad = { tareas: string[]; referenciaSus: number };
