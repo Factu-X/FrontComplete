@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import DataTable from '../molecules/DataTable';
+import DateRange from '../molecules/DateRange';
 import Modal from '../molecules/Modal';
 import SearchBar from '../molecules/SearchBar';
 import { ToastItem } from '../molecules/ToastContainer';
 import InvoiceAccount from './InvoiceAccount';
 import { apiRequest, ApiEntityResponse, ApiSession } from '../../lib/api';
-import { ANTIGUEDAD_LABELS, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
+import { ANTIGUEDAD_LABELS, carteraQuery, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
 import { formatCOP, toNumber } from '../../lib/orders';
 import type { Antiguedad, BackendCartera, CuentaFactura } from '../../lib/types';
 
@@ -37,11 +38,13 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
   const [cartera, setCartera] = useState<BackendCartera | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('CON_SALDO');
   const [search, setSearch] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [selected, setSelected] = useState<CuentaFactura | null>(null);
 
   async function load() {
     try {
-      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?filtro=${filtro}`, session);
+      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?${carteraQuery(filtro, desde, hasta)}`, session);
       setCartera(response.data);
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar la cartera', type: 'error' });
@@ -50,7 +53,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
 
   useEffect(() => {
     void load();
-  }, [filtro, session.token]);
+  }, [filtro, desde, hasta, session.token]);
 
   const resumen = cartera?.resumen;
   const q = search.trim().toLowerCase();
@@ -148,6 +151,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
             >{l}</button>
           ))}
         </div>
+        <DateRange desde={desde} hasta={hasta} onDesde={setDesde} onHasta={setHasta} etiqueta="Emitidas" onLimpiar={() => { setDesde(''); setHasta(''); }} />
       </div>
 
       <DataTable columns={columns} data={filas} emptyMessage={cartera ? 'No hay facturas con este filtro' : 'Cargando cartera...'} />

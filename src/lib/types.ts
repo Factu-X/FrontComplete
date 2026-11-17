@@ -340,6 +340,7 @@ export type ReporteFacturacion = {
     notasCredito: string;
     neto: string;
     recaudado: string;
+    ordenesFinalizadas: number;
     ticketPromedio: string;
   };
   porEstadoDian: Partial<Record<EstadoDian, number>>;

@@ -41,11 +41,13 @@ export const compactCOP = (valor: number) =>
 
 const iso = (fecha: Date) => fecha.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
-export type Preset = 'mes' | 'mes-anterior' | '30-dias' | 'anio';
+export type Preset = 'hoy' | 'mes' | 'mes-anterior' | '30-dias' | 'anio';
 
 export const rangoPreset = (preset: Preset, hoy = new Date()): { desde: string; hasta: string } => {
   const [y, m] = iso(hoy).split('-').map(Number) as [number, number];
   switch (preset) {
+    case 'hoy':
+      return { desde: iso(hoy), hasta: iso(hoy) };
     case 'mes':
       return { desde: `${y}-${String(m).padStart(2, '0')}-01`, hasta: iso(hoy) };
     case 'mes-anterior': {

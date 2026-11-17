@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../atoms/Button';
+import DateRange from '../molecules/DateRange';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiSession, saveBlob } from '../../lib/api';
 import { ANTIGUEDAD_LABELS, DIAN_LABELS, FORMA_PAGO_LABELS, METODO_LABELS, toCsv } from '../../lib/invoices';
@@ -8,6 +9,7 @@ import { agruparSerie, compactCOP, escalaY, rangoPreset, type Preset, type Punto
 import type { Antiguedad, EstadoDian, FormaPago, MetodoPago, ReporteFacturacion } from '../../lib/types';
 
 const presets: [Preset, string][] = [
+  ['hoy', 'Hoy'],
   ['mes', 'Este mes'],
   ['mes-anterior', 'Mes anterior'],
   ['30-dias', 'Últimos 30 días'],
@@ -137,7 +139,7 @@ export default function BillingDashboard({ session, addToast }: Props) {
 
   const t = reporte?.totales;
   const kpis = [
-    { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
+    { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · ${t?.ordenesFinalizadas ?? 0} órdenes finalizadas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
     { label: 'Neto (− notas crédito)', value: formatCOP(t?.neto ?? 0), sub: `Notas crédito ${formatCOP(t?.notasCredito ?? 0)}`, color: 'text-[#e6edf3]' },
     { label: 'Recaudado en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
     { label: 'Por cobrar hoy', value: formatCOP(reporte?.cartera.porCobrar ?? 0), sub: `Vencido ${formatCOP(reporte?.cartera.vencido ?? 0)}`, color: 'text-yellow-400' },
@@ -166,26 +168,14 @@ export default function BillingDashboard({ session, addToast }: Props) {
             >{label}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#8b949e]">
-          <input
-            type="date"
-            aria-label="Desde"
-            value={rango.desde}
-            max={rango.hasta}
-            onChange={e => { setPreset('custom'); setRango(r => ({ ...r, desde: e.target.value })); }}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
-          <span>a</span>
-          <input
-            type="date"
-            aria-label="Hasta"
-            value={rango.hasta}
-            min={rango.desde}
-            onChange={e => { setPreset('custom'); setRango(r => ({ ...r, hasta: e.target.value })); }}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
+        <DateRange
+          desde={rango.desde}
+          hasta={rango.hasta}
+          onDesde={v => { setPreset('custom'); setRango(r => ({ ...r, desde: v })); }}
+          onHasta={v => { setPreset('custom'); setRango(r => ({ ...r, hasta: v })); }}
+        >
           {loading && <span className="text-[#6e7681]">Actualizando...</span>}
-        </div>
+        </DateRange>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
