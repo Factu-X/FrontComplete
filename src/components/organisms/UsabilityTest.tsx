@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -8,7 +8,7 @@ import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiDownload, apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
 import {
-  NIVEL_LABEL, PRIORIDADES, PRIORIDAD_BADGE, PRIORIDAD_LABEL, SUS_QUESTIONS, calcSus, ordenarPorPrioridad, susLabel,
+  NIVEL_LABEL, PRIORIDADES, PRIORIDAD_BADGE, PRIORIDAD_LABEL, SUS_QUESTIONS, calcSus, ordenarPorPrioridad, susLabel, validateSessionDate,
 } from '../../lib/usability';
 import type {
   BackendHallazgoUsabilidad, BackendSesionUsabilidad, PrioridadHallazgo, ResumenUsabilidad, TareasBaseUsabilidad,
@@ -46,8 +46,18 @@ export default function UsabilityTest({ session, addToast }: Props) {
   const [newFinding, setNewFinding] = useState({ descripcion: '', pantalla: '', prioridad: 'ALTA' as PrioridadHallazgo });
   const [nameError, setNameError] = useState('');
 
-  const fail = (error: unknown, fallback: string) =>
-    addToast({ message: error instanceof Error ? error.message : fallback, type: 'error' });
+  const [dateError, setDateError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Sesiones y tareas base fallan juntas (403, red caida): un solo aviso por mensaje.
+  const shownErrors = useRef(new Set<string>());
+
+  const fail = (error: unknown, fallback: string) => {
+    const message = error instanceof Error ? error.message : fallback;
+    if (shownErrors.current.has(message)) return message;
+    shownErrors.current.add(message);
+    addToast({ message, type: 'error' });
+    return message;
+  };
 
   async function load() {
     try {
@@ -57,14 +67,16 @@ export default function UsabilityTest({ session, addToast }: Props) {
       ]);
       setSessions(list.data);
       setSummary(resumen.data);
+      setLoadError(null);
     } catch (error) {
-      fail(error, 'No se pudieron cargar las sesiones de usabilidad');
+      setLoadError(fail(error, 'No se pudieron cargar las sesiones de usabilidad'));
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    shownErrors.current.clear();
     void load();
     apiRequest<ApiEntityResponse<TareasBaseUsabilidad>>('/usabilidad/tareas-base', session)
       .then(response => setBaseTasks(response.data.tareas))
@@ -79,13 +91,17 @@ export default function UsabilityTest({ session, addToast }: Props) {
   function resetForm() {
     setParticipantName(''); setParticipantRole(''); setSessionDate(today()); setObservations('');
     setTasks(baseTasks.map(tarea => ({ tarea, completada: true, errores: 0 })));
-    setAnswers(SUS_QUESTIONS.map(() => 3)); setFindings([]); setNameError('');
+    setAnswers(SUS_QUESTIONS.map(() => 3)); setFindings([]); setNameError(''); setDateError('');
     setNewFinding({ descripcion: '', pantalla: '', prioridad: 'ALTA' }); setStep(1);
   }
 
   function next() {
-    if (step === 1 && !participantName.trim()) { setNameError('El nombre del participante es obligatorio'); return; }
-    setNameError('');
+    if (step === 1) {
+      const nombre = participantName.trim() ? '' : 'El nombre del participante es obligatorio';
+      const fecha = validateSessionDate(sessionDate, today());
+      setNameError(nombre); setDateError(fecha);
+      if (nombre || fecha) return;
+    }
     setStep(step + 1);
   }
 
@@ -182,7 +198,7 @@ export default function UsabilityTest({ session, addToast }: Props) {
           <Button variant="outline" disabled={downloading || sessions.length === 0} onClick={() => void handleDownload()}>
             {downloading ? 'Generando...' : 'Descargar informe'}
           </Button>
-          <Button onClick={() => { resetForm(); setModalOpen(true); }} icon={<span>+</span>} disabled={baseTasks.length === 0}>Nueva sesión</Button>
+          <Button onClick={() => { resetForm(); setModalOpen(true); }} icon={<span>+</span>} disabled={baseTasks.length === 0} title={baseTasks.length === 0 ? 'No se pudieron cargar las tareas base; recarga la página' : undefined}>Nueva sesión</Button>
         </div>
       </div>
 
@@ -246,7 +262,7 @@ export default function UsabilityTest({ session, addToast }: Props) {
         </div>
       )}
 
-      <DataTable columns={sessionColumns} data={sessions} emptyMessage={loading ? 'Cargando sesiones...' : 'No hay sesiones registradas'} />
+      <DataTable columns={sessionColumns} data={sessions} emptyMessage={loading ? 'Cargando sesiones...' : loadError ? `No se pudieron cargar las sesiones: ${loadError}` : 'No hay sesiones registradas'} />
 
       <Modal
         title={`Nueva sesión de usabilidad — Paso ${step}/3`}
@@ -261,10 +277,10 @@ export default function UsabilityTest({ session, addToast }: Props) {
           <div className="flex flex-col gap-4">
             <div className="text-sm font-semibold text-[#e6edf3] mb-1">Datos del participante y tareas</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Nombre participante *" value={participantName} onChange={e => setParticipantName(e.target.value)} placeholder="Carlos M." error={nameError} />
-              <Input label="Perfil / Rol" value={participantRole} onChange={e => setParticipantRole(e.target.value)} placeholder="Mecánico / Administrador" />
+              <Input label="Nombre participante *" value={participantName} onChange={e => setParticipantName(e.target.value)} placeholder="Carlos M." error={nameError} maxLength={150} />
+              <Input label="Perfil / Rol" value={participantRole} onChange={e => setParticipantRole(e.target.value)} placeholder="Mecánico / Administrador" maxLength={200} />
             </div>
-            <Input label="Fecha de sesión" type="date" value={sessionDate} onChange={e => setSessionDate(e.target.value)} />
+            <Input label="Fecha de sesión *" type="date" value={sessionDate} max={today()} onChange={e => setSessionDate(e.target.value)} error={dateError} />
             <div>
               <div className="text-xs font-medium text-[#8b949e] uppercase tracking-wider mb-2">Tareas evaluadas (sin guiar al participante)</div>
               {tasks.map((task, i) => (
@@ -325,8 +341,8 @@ export default function UsabilityTest({ session, addToast }: Props) {
             <div className="text-sm font-semibold text-[#e6edf3] mb-1">Hallazgos y problemas encontrados</div>
             <div className="flex flex-col gap-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Input label="Descripción del hallazgo" value={newFinding.descripcion} onChange={e => setNewFinding(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción del problema..." />
-                <Input label="Pantalla / módulo" value={newFinding.pantalla} onChange={e => setNewFinding(f => ({ ...f, pantalla: e.target.value }))} placeholder="Ej: Clientes" />
+                <Input label="Descripción del hallazgo" value={newFinding.descripcion} onChange={e => setNewFinding(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción del problema..." maxLength={2000} />
+                <Input label="Pantalla / módulo" value={newFinding.pantalla} onChange={e => setNewFinding(f => ({ ...f, pantalla: e.target.value }))} placeholder="Ej: Clientes" maxLength={100} />
               </div>
               <div className="flex gap-2 items-end">
                 <div className="flex-1 flex flex-col gap-1">

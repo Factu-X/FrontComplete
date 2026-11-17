@@ -63,3 +63,11 @@ describe('reminders: siguiente servicio', () => {
     });
   });
 });
+
+describe('reminders: límites del kilometraje', () => {
+  it('rechaza decimales y valores sobre el tope del backend, acepta el tope', () => {
+    expect(validateReminderForm(form({ triggerType: 'km', kilometrajeObjetivo: 1500.5 }))).toHaveProperty('kilometrajeObjetivo');
+    expect(validateReminderForm(form({ triggerType: 'km', kilometrajeObjetivo: 1_000_001 }))).toHaveProperty('kilometrajeObjetivo');
+    expect(validateReminderForm(form({ triggerType: 'km', kilometrajeObjetivo: 1_000_000 }))).not.toHaveProperty('kilometrajeObjetivo');
+  });
+});

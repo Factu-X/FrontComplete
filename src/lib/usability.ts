@@ -35,6 +35,10 @@ export const NIVEL_LABEL: Record<NivelSus, string> = {
   DEFICIENTE: 'Deficiente',
 };
 
+// La fecha de la sesion es obligatoria y no puede ser futura (mismo criterio que el backend). Fechas YYYY-MM-DD.
+export const validateSessionDate = (fecha: string, hoy: string) =>
+  !fecha ? 'La fecha de la sesión es obligatoria' : fecha > hoy ? 'La fecha no puede ser futura' : '';
+
 export const PRIORIDADES: PrioridadHallazgo[] = ['CRITICA', 'ALTA', 'MEDIA', 'BAJA'];
 
 export const PRIORIDAD_LABEL: Record<PrioridadHallazgo, string> = {

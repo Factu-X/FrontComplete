@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcSus, ordenarPorPrioridad, susLabel } from './usability';
+import { calcSus, ordenarPorPrioridad, susLabel, validateSessionDate } from './usability';
 
 describe('usability: SUS', () => {
   it('da 100 con las mejores respuestas, 0 con las peores y 50 con todo neutro', () => {
@@ -30,5 +30,14 @@ describe('usability: hallazgos', () => {
     const lista = [{ prioridad: 'BAJA' as const }, { prioridad: 'CRITICA' as const }, { prioridad: 'MEDIA' as const }];
     expect(ordenarPorPrioridad(lista).map(h => h.prioridad)).toEqual(['CRITICA', 'MEDIA', 'BAJA']);
     expect(lista[0]?.prioridad).toBe('BAJA');
+  });
+});
+
+describe('usability: fecha de la sesión', () => {
+  it('es obligatoria y no puede ser futura', () => {
+    expect(validateSessionDate('', '2026-11-16')).not.toBe('');
+    expect(validateSessionDate('2026-11-17', '2026-11-16')).not.toBe('');
+    expect(validateSessionDate('2026-11-16', '2026-11-16')).toBe('');
+    expect(validateSessionDate('2026-01-10', '2026-11-16')).toBe('');
   });
 });

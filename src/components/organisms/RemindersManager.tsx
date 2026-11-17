@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../atoms/Button';
 import Badge from '../atoms/Badge';
 import Input from '../atoms/Input';
@@ -10,6 +10,7 @@ import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
 import {
+  MAX_KILOMETRAJE,
   ESTADO_BADGE, MAINTENANCE_TYPES, TRIGGER_OPTIONS, emptyReminderForm, formatFecha, nextReminderForm,
   toRecordatorioPayload, validateReminderForm, type ReminderForm, type ReminderTrigger,
 } from '../../lib/reminders';
@@ -43,16 +44,27 @@ export default function RemindersManager({ session, addToast, onChanged }: Props
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notifyingAll, setNotifyingAll] = useState(false);
 
-  const fail = (error: unknown, fallback: string) =>
-    addToast({ message: error instanceof Error ? error.message : fallback, type: 'error' });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Al cargar, recordatorios y clientes fallan juntos (403, red caida): se muestra un solo aviso por mensaje.
+  const shownErrors = useRef(new Set<string>());
+
+  const fail = (error: unknown, fallback: string) => {
+    const message = error instanceof Error ? error.message : fallback;
+    if (shownErrors.current.has(message)) return message;
+    shownErrors.current.add(message);
+    addToast({ message, type: 'error' });
+    return message;
+  };
 
   async function load() {
     try {
       const response = await apiRequest<ApiListResponse<BackendRecordatorio>>('/recordatorios', session);
       setReminders(response.data);
+      setLoadError(null);
     } catch (error) {
-      fail(error, 'No se pudieron cargar los recordatorios');
+      setLoadError(fail(error, 'No se pudieron cargar los recordatorios'));
     } finally {
+      shownErrors.current.clear();
       setLoading(false);
     }
   }
@@ -60,7 +72,7 @@ export default function RemindersManager({ session, addToast, onChanged }: Props
   async function loadMotos() {
     try {
       const response = await apiRequest<ApiListResponse<BackendCliente>>('/clientes', session);
-      setMotos(response.data.flatMap(c => (c.motocicletas ?? [])
+      setMotos(response.data.filter(c => c.activo).flatMap(c => (c.motocicletas ?? [])
         .filter(m => m.activa)
         .map(m => ({ id: m.id, label: `${m.placa} — ${m.marca} ${m.modelo} (${c.nombreRazonSocial})` }))));
     } catch (error) {
@@ -69,6 +81,7 @@ export default function RemindersManager({ session, addToast, onChanged }: Props
   }
 
   useEffect(() => {
+    shownErrors.current.clear();
     void load();
     void loadMotos();
   }, [session.token]);
@@ -328,7 +341,7 @@ export default function RemindersManager({ session, addToast, onChanged }: Props
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando recordatorios...' : 'No se encontraron recordatorios'} />
+      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando recordatorios...' : loadError ? `No se pudieron cargar los recordatorios: ${loadError}` : 'No se encontraron recordatorios'} />
 
       <Modal title="Nuevo recordatorio de mantenimiento" open={modalOpen} onClose={() => setModalOpen(false)} onConfirm={() => void handleCreate()} loading={saving} width="max-w-lg">
         <ReminderFormFields form={form} setForm={setForm} errors={errors} motoOptions={motoOptions} />
@@ -414,6 +427,9 @@ function ReminderFormFields({ form, setForm, errors, motoOptions, fixedMoto }: F
         <Input
           label="Kilometraje estimado *"
           type="number"
+          min={1}
+          max={MAX_KILOMETRAJE}
+          step={1}
           value={form.kilometrajeObjetivo}
           onChange={e => set({ kilometrajeObjetivo: Number(e.target.value) || '' })}
           error={errors['kilometrajeObjetivo']}

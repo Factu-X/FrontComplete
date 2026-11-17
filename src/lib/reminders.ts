@@ -13,6 +13,9 @@ export const MAINTENANCE_TYPES = [
   'Otro',
 ];
 
+// Mismo tope que el backend (createRecordatorioSchema).
+export const MAX_KILOMETRAJE = 1_000_000;
+
 export type ReminderTrigger = 'date' | 'km' | 'both';
 
 export const TRIGGER_OPTIONS: { value: ReminderTrigger; label: string }[] = [
@@ -75,8 +78,11 @@ export const validateReminderForm = (form: ReminderForm) => {
     errors['customMaintenanceType'] = 'Escribe el tipo de mantenimiento';
   }
   if (usaFecha && !form.fechaObjetivo) errors['fechaObjetivo'] = 'La fecha es obligatoria';
-  if (usaKm && (form.kilometrajeObjetivo === '' || Number(form.kilometrajeObjetivo) <= 0)) {
+  const km = Number(form.kilometrajeObjetivo);
+  if (usaKm && (form.kilometrajeObjetivo === '' || km <= 0)) {
     errors['kilometrajeObjetivo'] = 'El kilometraje debe ser mayor a 0';
+  } else if (usaKm && (!Number.isInteger(km) || km > MAX_KILOMETRAJE)) {
+    errors['kilometrajeObjetivo'] = `El kilometraje debe ser un número entero de hasta ${MAX_KILOMETRAJE.toLocaleString('es-CO')}`;
   }
 
   return errors;
