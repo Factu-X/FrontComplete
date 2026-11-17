@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { canSendToDian, groupTaxes, matchesInvoiceSearch, ordersPendingInvoice } from './invoices';
+import { canSendToDian, carteraQuery, groupTaxes, matchesInvoiceSearch, ordersPendingInvoice } from './invoices';
 
 describe('canSendToDian', () => {
   it.each([
@@ -53,5 +53,13 @@ describe('matchesInvoiceSearch', () => {
 
   it('rejects unrelated text', () => {
     expect(matchesInvoiceSearch(factura, 'yamaha')).toBe(false);
+  });
+});
+
+describe('carteraQuery', () => {
+  it('envia solo los extremos del rango que tienen fecha', () => {
+    expect(carteraQuery('CON_SALDO', '', '')).toBe('filtro=CON_SALDO');
+    expect(carteraQuery('TODAS', '2026-11-01', '')).toBe('filtro=TODAS&desde=2026-11-01');
+    expect(carteraQuery('VENCIDAS', '2026-11-01', '2026-11-30')).toBe('filtro=VENCIDAS&desde=2026-11-01&hasta=2026-11-30');
   });
 });

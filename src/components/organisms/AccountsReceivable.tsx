@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import DataTable from '../molecules/DataTable';
+import DateRange from '../molecules/DateRange';
 import Modal from '../molecules/Modal';
 import SearchBar from '../molecules/SearchBar';
 import { ToastItem } from '../molecules/ToastContainer';
 import InvoiceAccount from './InvoiceAccount';
 import { apiRequest, ApiEntityResponse, ApiSession } from '../../lib/api';
-import { ANTIGUEDAD_LABELS, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
+import { ANTIGUEDAD_LABELS, carteraQuery, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
 import { formatCOP, toNumber } from '../../lib/orders';
 import type { Antiguedad, BackendCartera, CuentaFactura } from '../../lib/types';
 
@@ -43,7 +44,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
 
   async function load() {
     try {
-      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?${new URLSearchParams({ filtro, ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) })}`, session);
+      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?${carteraQuery(filtro, desde, hasta)}`, session);
       setCartera(response.data);
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar la cartera', type: 'error' });
@@ -150,29 +151,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
             >{l}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#8b949e]">
-          <span>Emitidas</span>
-          <input
-            type="date"
-            aria-label="Emitidas desde"
-            value={desde}
-            max={hasta || undefined}
-            onChange={e => setDesde(e.target.value)}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
-          <span>a</span>
-          <input
-            type="date"
-            aria-label="Emitidas hasta"
-            value={hasta}
-            min={desde || undefined}
-            onChange={e => setHasta(e.target.value)}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
-          {(desde || hasta) && (
-            <button type="button" onClick={() => { setDesde(''); setHasta(''); }} className="text-[#f97316] hover:underline">Limpiar</button>
-          )}
-        </div>
+        <DateRange desde={desde} hasta={hasta} onDesde={setDesde} onHasta={setHasta} etiqueta="Emitidas" onLimpiar={() => { setDesde(''); setHasta(''); }} />
       </div>
 
       <DataTable columns={columns} data={filas} emptyMessage={cartera ? 'No hay facturas con este filtro' : 'Cargando cartera...'} />

@@ -134,3 +134,7 @@ export const toCsv = (headers: string[], rows: (string | number)[][]) =>
       return /[";\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     }).join(';'))
     .join('\n');
+
+// HU-10: el rango de emision es opcional; un extremo vacio no se envia.
+export const carteraQuery = (filtro: string, desde: string, hasta: string) =>
+  new URLSearchParams({ filtro, ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) }).toString();

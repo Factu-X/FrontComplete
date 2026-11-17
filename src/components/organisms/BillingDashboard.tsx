@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../atoms/Button';
+import DateRange from '../molecules/DateRange';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiSession, saveBlob } from '../../lib/api';
 import { ANTIGUEDAD_LABELS, DIAN_LABELS, FORMA_PAGO_LABELS, METODO_LABELS, toCsv } from '../../lib/invoices';
@@ -167,26 +168,14 @@ export default function BillingDashboard({ session, addToast }: Props) {
             >{label}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#8b949e]">
-          <input
-            type="date"
-            aria-label="Desde"
-            value={rango.desde}
-            max={rango.hasta}
-            onChange={e => { setPreset('custom'); setRango(r => ({ ...r, desde: e.target.value })); }}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
-          <span>a</span>
-          <input
-            type="date"
-            aria-label="Hasta"
-            value={rango.hasta}
-            min={rango.desde}
-            onChange={e => { setPreset('custom'); setRango(r => ({ ...r, hasta: e.target.value })); }}
-            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
-          />
+        <DateRange
+          desde={rango.desde}
+          hasta={rango.hasta}
+          onDesde={v => { setPreset('custom'); setRango(r => ({ ...r, desde: v })); }}
+          onHasta={v => { setPreset('custom'); setRango(r => ({ ...r, hasta: v })); }}
+        >
           {loading && <span className="text-[#6e7681]">Actualizando...</span>}
-        </div>
+        </DateRange>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
