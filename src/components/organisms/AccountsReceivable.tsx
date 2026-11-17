@@ -37,11 +37,13 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
   const [cartera, setCartera] = useState<BackendCartera | null>(null);
   const [filtro, setFiltro] = useState<Filtro>('CON_SALDO');
   const [search, setSearch] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
   const [selected, setSelected] = useState<CuentaFactura | null>(null);
 
   async function load() {
     try {
-      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?filtro=${filtro}`, session);
+      const response = await apiRequest<ApiEntityResponse<BackendCartera>>(`/cartera?${new URLSearchParams({ filtro, ...(desde ? { desde } : {}), ...(hasta ? { hasta } : {}) })}`, session);
       setCartera(response.data);
     } catch (error) {
       addToast({ message: error instanceof Error ? error.message : 'No se pudo cargar la cartera', type: 'error' });
@@ -50,7 +52,7 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
 
   useEffect(() => {
     void load();
-  }, [filtro, session.token]);
+  }, [filtro, desde, hasta, session.token]);
 
   const resumen = cartera?.resumen;
   const q = search.trim().toLowerCase();
@@ -147,6 +149,29 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
               className={`whitespace-nowrap px-3 py-2 transition-colors ${filtro === v ? 'bg-[#f97316] text-[#0d1117] font-semibold' : 'text-[#8b949e] hover:bg-[#21262d]'}`}
             >{l}</button>
           ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-[#8b949e]">
+          <span>Emitidas</span>
+          <input
+            type="date"
+            aria-label="Emitidas desde"
+            value={desde}
+            max={hasta || undefined}
+            onChange={e => setDesde(e.target.value)}
+            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
+          />
+          <span>a</span>
+          <input
+            type="date"
+            aria-label="Emitidas hasta"
+            value={hasta}
+            min={desde || undefined}
+            onChange={e => setHasta(e.target.value)}
+            className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-2 py-1.5 text-[#e6edf3]"
+          />
+          {(desde || hasta) && (
+            <button type="button" onClick={() => { setDesde(''); setHasta(''); }} className="text-[#f97316] hover:underline">Limpiar</button>
+          )}
         </div>
       </div>
 

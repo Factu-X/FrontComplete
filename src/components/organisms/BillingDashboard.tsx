@@ -8,6 +8,7 @@ import { agruparSerie, compactCOP, escalaY, rangoPreset, type Preset, type Punto
 import type { Antiguedad, EstadoDian, FormaPago, MetodoPago, ReporteFacturacion } from '../../lib/types';
 
 const presets: [Preset, string][] = [
+  ['hoy', 'Hoy'],
   ['mes', 'Este mes'],
   ['mes-anterior', 'Mes anterior'],
   ['30-dias', 'Últimos 30 días'],
@@ -137,7 +138,7 @@ export default function BillingDashboard({ session, addToast }: Props) {
 
   const t = reporte?.totales;
   const kpis = [
-    { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
+    { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · ${t?.ordenesFinalizadas ?? 0} órdenes finalizadas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
     { label: 'Neto (− notas crédito)', value: formatCOP(t?.neto ?? 0), sub: `Notas crédito ${formatCOP(t?.notasCredito ?? 0)}`, color: 'text-[#e6edf3]' },
     { label: 'Recaudado en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
     { label: 'Por cobrar hoy', value: formatCOP(reporte?.cartera.porCobrar ?? 0), sub: `Vencido ${formatCOP(reporte?.cartera.vencido ?? 0)}`, color: 'text-yellow-400' },

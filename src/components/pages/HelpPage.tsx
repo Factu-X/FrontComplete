@@ -39,7 +39,7 @@ const SECTIONS = [
       { subtitle: 'Generar una factura', text: 'Desde Facturación → seleccione una orden finalizada sin factura y haga clic en "Generar factura". Elija la forma de pago (contado/crédito) y la fecha de vencimiento si aplica.' },
       { subtitle: 'CUFE y DIAN', text: 'Cada factura recibe un CUFE (Código Único de Factura Electrónica) calculado conforme al Anexo Técnico DIAN. La transmisión simula la validación con respuestas realistas: aprobada, rechazada o error de conexión.' },
       { subtitle: 'Notas crédito', text: 'Desde el módulo Notas Crédito, seleccione la factura a afectar, el motivo (códigos DIAN 1-5) y el valor del ajuste. El valor no puede superar el saldo disponible de la factura.' },
-      { subtitle: 'Cuentas por cobrar', text: 'El módulo Cartera muestra todas las facturas con pagos pendientes, ordenadas de mayor a menor mora. Registre abonos parciales o totales desde el botón de pago en Facturación.' },
+      { subtitle: 'Cuentas por cobrar', text: 'El módulo Cartera muestra todas las facturas con pagos pendientes, ordenadas de mayor a menor mora. Puede buscar por cliente y filtrar por fecha de emisión. Registre abonos parciales o totales desde el botón de pago en Facturación.' },
     ],
   },
   {
@@ -66,7 +66,7 @@ const SECTIONS = [
     icon: '📊',
     title: 'Dashboard y reportes',
     content: [
-      { subtitle: 'Dashboard de facturación', text: 'Muestra KPIs del período seleccionado: total facturado, neto (descontando notas crédito), órdenes finalizadas y cartera pendiente. Filtre por hoy, semana, mes o rango personalizado.' },
+      { subtitle: 'Dashboard de facturación', text: 'Muestra KPIs del período seleccionado: total facturado, neto (descontando notas crédito), órdenes finalizadas y cartera pendiente. Filtre por hoy, este mes, mes anterior, últimos 30 días, este año o un rango personalizado.' },
       { subtitle: 'Servicios y repuestos más usados', text: 'El dashboard incluye gráficas de los servicios y repuestos con mayor demanda en el período, útil para planificación de inventario.' },
     ],
   },
