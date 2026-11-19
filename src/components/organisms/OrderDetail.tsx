@@ -85,6 +85,7 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
   const canBill = canInvoice(userRole);
   useEffect(() => {
     if (!order || order.estado !== 'FINALIZADA' || !canBill || !onInvoiceOrder) return;
+    // shortcut: solo mira las 200 facturas más recientes (igual que InvoiceManager); el backend igual rechaza facturar dos veces. Pasar a un filtro ?ordenId= si crece el volumen.
     apiRequest<ApiListResponse<BackendFactura>>('/facturas?limit=200', session)
       .then(response => setInvoiced(ordersPendingInvoice([order], response.data).length === 0))
       .catch(() => setInvoiced(null));
