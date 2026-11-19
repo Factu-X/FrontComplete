@@ -15,10 +15,10 @@ import type {
 import { toNumber } from './orders';
 
 export const DIAN_LABELS: Record<EstadoDian, string> = {
-  PENDIENTE_ENVIO: 'Pendiente envío',
-  ENVIADA: 'Enviada',
-  VALIDADA: 'Validada',
-  RECHAZADA: 'Rechazada',
+  PENDIENTE_ENVIO: 'Pendiente de enviar',
+  ENVIADA: 'Enviada, esperando respuesta',
+  VALIDADA: 'Aceptada por la DIAN',
+  RECHAZADA: 'Rechazada por la DIAN',
 };
 
 export const DIAN_BADGE: Record<EstadoDian, 'warning' | 'service' | 'active' | 'inactive'> = {

@@ -15,15 +15,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◈', group: 'main' },
+  { id: 'dashboard', label: 'Inicio', icon: '◈', group: 'main' },
   { id: 'orders', label: 'Órdenes', icon: '⊞', group: 'main' },
   { id: 'customers', label: 'Clientes', icon: '◎', group: 'main' },
   { id: 'catalog', label: 'Catálogo', icon: '≡', group: 'main' },
   { id: 'reminders', label: 'Recordatorios', icon: '◷', group: 'ops' },
-  { id: 'invoices', label: 'Facturación', icon: '₡', group: 'ops' },
-  { id: 'credit-notes', label: 'Notas Crédito', icon: '↩', group: 'ops' },
-  { id: 'receivables', label: 'Cartera', icon: '◑', group: 'ops' },
-  { id: 'billing-dashboard', label: 'Resumen Billing', icon: '▤', group: 'ops' },
+  { id: 'invoices', label: 'Facturas', icon: '₡', group: 'ops' },
+  { id: 'credit-notes', label: 'Notas crédito', icon: '↩', group: 'ops' },
+  { id: 'receivables', label: 'Por cobrar', icon: '◑', group: 'ops' },
+  { id: 'billing-dashboard', label: 'Ingresos y reportes', icon: '▤', group: 'ops' },
   { id: 'settings', label: 'Configuración', icon: '⚙', group: 'admin' },
   { id: 'users', label: 'Usuarios', icon: '⊙', group: 'admin' },
   { id: 'usability', label: 'Usabilidad', icon: '◫', group: 'admin' },

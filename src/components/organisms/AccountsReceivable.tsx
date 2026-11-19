@@ -98,8 +98,8 @@ export default function AccountsReceivable({ session, addToast, onChanged }: Pro
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-xl font-bold text-[#e6edf3]">Cartera</h1>
-        <p className="text-sm text-[#6e7681] mt-0.5">HU-10 · Cuentas por cobrar, abonos y antigüedad de la deuda</p>
+        <h1 className="text-xl font-bold text-[#e6edf3]">Por cobrar</h1>
+        <p className="text-sm text-[#6e7681] mt-0.5">Facturas con saldo pendiente: busque al cliente y pulse Cobrar</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

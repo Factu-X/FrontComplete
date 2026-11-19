@@ -325,7 +325,7 @@ export default function CustomerManager({ addToast, session }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Clientes y Motocicletas</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-04 · Registro de clientes y vehículos del taller</p>
+          <p className="text-sm text-[#6e7681] mt-0.5">Clientes del taller y sus motocicletas, necesarios para crear órdenes y facturas</p>
         </div>
         <Button onClick={openCreate} icon={<span className="text-base leading-none">+</span>}>Nuevo cliente</Button>
       </div>
@@ -344,7 +344,7 @@ export default function CustomerManager({ addToast, session }: Props) {
       </div>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre, identificación o teléfono..." />
-      <DataTable columns={customerColumns} data={filtered} emptyMessage={loading ? 'Cargando clientes...' : 'No se encontraron clientes'} />
+      <DataTable columns={customerColumns} data={filtered} emptyMessage={loading ? 'Cargando clientes...' : 'Aún no hay clientes. Use «Nuevo cliente» para registrar el primero.'} />
 
       {/* Customer Form Modal */}
       <Modal
@@ -357,7 +357,7 @@ export default function CustomerManager({ addToast, session }: Props) {
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
-              label="Tipo ID *"
+              label="Tipo de documento *"
               options={idTypes}
               value={form.idType}
               onChange={e => setForm(f => ({ ...f, idType: e.target.value }))}

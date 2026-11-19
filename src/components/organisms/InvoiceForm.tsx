@@ -17,6 +17,8 @@ interface Props {
 
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
+const IVA_LABELS: Record<string, string> = { GRAVADO: 'con IVA', EXENTO: 'exento de IVA', EXCLUIDO: 'sin IVA (excluido)' };
+
 export default function InvoiceForm({ session, pendingOrders, addToast, onCreated, onCancel }: Props) {
   const [ordenId, setOrdenId] = useState(pendingOrders[0]?.id ?? '');
   const [detalles, setDetalles] = useState<BackendDetalleOrden[]>([]);
@@ -119,7 +121,7 @@ export default function InvoiceForm({ session, pendingOrders, addToast, onCreate
                 <td className="px-3 py-2 text-[#e6edf3]">{d.nombreItem}<span className="ml-2 font-mono text-xs text-[#6e7681]">{d.codigoItem}</span></td>
                 <td className="px-3 py-2 text-right font-mono text-xs text-[#8b949e]">{Number(d.cantidad)}</td>
                 <td className="hidden sm:table-cell px-3 py-2 text-right font-mono text-xs text-[#8b949e]">
-                  {d.tratamientoIva === 'GRAVADO' ? `${Number(d.tarifaIva)}%` : d.tratamientoIva.toLowerCase()}
+                  {d.tratamientoIva === 'GRAVADO' ? `${Number(d.tarifaIva)}%` : IVA_LABELS[d.tratamientoIva]}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-[#e6edf3]">{formatCOP(d.total)}</td>
               </tr>

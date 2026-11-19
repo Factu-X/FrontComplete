@@ -192,7 +192,7 @@ export default function UsabilityTest({ session, addToast }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Pruebas de Usabilidad (SUS)</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-14 · Evaluación de usabilidad con usuarios piloto</p>
+          <p className="text-sm text-[#6e7681] mt-0.5">Evaluación de usabilidad con usuarios piloto</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" disabled={downloading || sessions.length === 0} onClick={() => void handleDownload()}>

@@ -36,10 +36,10 @@ const SECTIONS = [
     icon: '🧾',
     title: 'Facturación electrónica',
     content: [
-      { subtitle: 'Generar una factura', text: 'Desde Facturación → seleccione una orden finalizada sin factura y haga clic en "Generar factura". Elija la forma de pago (contado/crédito) y la fecha de vencimiento si aplica.' },
+      { subtitle: 'Generar una factura', text: 'Desde Facturas → pulse "Facturar orden", seleccione una orden finalizada sin factura y haga clic en "Generar factura". Elija la forma de pago (contado/crédito) y la fecha de vencimiento si aplica.' },
       { subtitle: 'CUFE y DIAN', text: 'Cada factura recibe un CUFE (Código Único de Factura Electrónica) calculado conforme al Anexo Técnico DIAN. La transmisión simula la validación con respuestas realistas: aprobada, rechazada o error de conexión.' },
-      { subtitle: 'Notas crédito', text: 'Desde el módulo Notas Crédito, seleccione la factura a afectar, el motivo (códigos DIAN 1-5) y el valor del ajuste. El valor no puede superar el saldo disponible de la factura.' },
-      { subtitle: 'Cuentas por cobrar', text: 'El módulo Cartera muestra todas las facturas con pagos pendientes, ordenadas de mayor a menor mora. Puede buscar por cliente y filtrar por fecha de emisión. Registre abonos parciales o totales desde el botón de pago en Facturación.' },
+      { subtitle: 'Notas crédito', text: 'Desde el módulo Notas crédito, seleccione la factura a afectar, el motivo (códigos DIAN 1-5) y el valor del ajuste. El valor no puede superar el saldo disponible de la factura.' },
+      { subtitle: 'Cuentas por cobrar', text: 'El módulo Por cobrar muestra todas las facturas con pagos pendientes, ordenadas de mayor a menor mora. Puede buscar por cliente y filtrar por fecha de emisión. Registre abonos parciales o totales desde Por cobrar → Cobrar, o dentro del detalle de la factura → Registrar pago.' },
     ],
   },
   {
@@ -64,9 +64,9 @@ const SECTIONS = [
   {
     id: 'dashboard',
     icon: '📊',
-    title: 'Dashboard y reportes',
+    title: 'Inicio e ingresos y reportes',
     content: [
-      { subtitle: 'Dashboard de facturación', text: 'Muestra KPIs del período seleccionado: total facturado, neto (descontando notas crédito), órdenes finalizadas y cartera pendiente. Filtre por hoy, este mes, mes anterior, últimos 30 días, este año o un rango personalizado.' },
+      { subtitle: 'Ingresos y reportes', text: 'Muestra KPIs del período seleccionado: total facturado, neto (descontando notas crédito), órdenes finalizadas y cartera pendiente. Filtre por hoy, este mes, mes anterior, últimos 30 días, este año o un rango personalizado.' },
       { subtitle: 'Servicios y repuestos más usados', text: 'El dashboard incluye gráficas de los servicios y repuestos con mayor demanda en el período, útil para planificación de inventario.' },
     ],
   },
@@ -76,7 +76,7 @@ const SECTIONS = [
     title: 'Configuración de empresa',
     content: [
       { subtitle: 'Datos de la empresa', text: 'Ingrese NIT, razón social, dirección, teléfono y responsabilidades tributarias (Responsable IVA, Régimen Simple, etc.). Esta información aparece en todas las facturas electrónicas.' },
-      { subtitle: 'Numeración DIAN', text: 'Configure el rango autorizado de numeración: prefijo, número inicial y final, fecha de autorización y vencimiento. El sistema alerta cuando la numeración esté próxima a agotarse (últimos 50 números).' },
+      { subtitle: 'Numeración de facturas (DIAN)', text: 'Configure el rango autorizado de numeración: prefijo, número inicial y final, fecha de autorización y vencimiento. El sistema alerta cuando la numeración esté próxima a agotarse (últimos 50 números).' },
       { subtitle: 'Habilitación DIAN', text: 'Configure el NIT del ambiente de pruebas o producción, Client ID y Client Secret. En producción, use variables de entorno seguras para las credenciales.' },
     ],
   },
@@ -84,7 +84,7 @@ const SECTIONS = [
 
 const FAQ = [
   { q: '¿Puedo crear una factura sin configurar la empresa?', a: 'No. Debe completar al menos los datos básicos de empresa y la numeración DIAN antes de generar facturas electrónicas. El sistema muestra un checklist de completitud en la pantalla de configuración.' },
-  { q: '¿Qué pasa si la DIAN rechaza una factura?', a: 'La factura queda en estado "Rechazada" y puede reintentarse con el botón Reintentar. Un rechazo no elimina la factura; puede corregir los datos y volver a transmitir.' },
+  { q: '¿Qué pasa si la DIAN rechaza una factura?', a: 'La factura queda en estado "Rechazada por la DIAN" y puede reintentarse con el botón "Reintentar envío". Un rechazo no elimina la factura; puede corregir los datos y volver a transmitir.' },
   { q: '¿Puedo editar una orden finalizada?', a: 'No. Una vez que una orden pasa a estado "Finalizada", los datos no pueden modificarse. Esto garantiza la trazabilidad del servicio y la integridad de las facturas asociadas.' },
   { q: '¿Cómo funciona el IVA en las facturas?', a: 'El IVA del 19% se aplica únicamente sobre repuestos (partes). Los servicios de mano de obra tienen tarifa del 0%. El sistema calcula esto automáticamente en tiempo real.' },
   { q: '¿Puedo tener múltiples motos por cliente?', a: 'Sí. Cada cliente puede tener tantas motocicletas como requiera. Cada moto tiene su propio historial de servicios independiente.' },
@@ -99,7 +99,7 @@ export default function HelpPage() {
     <div className="flex flex-col gap-6 max-w-4xl">
       <div>
         <h1 className="text-xl font-bold text-[#e6edf3]">Documentación y Guía de Usuario</h1>
-        <p className="text-sm text-[#6e7681] mt-0.5">HU-15 · FactuX — Sistema de gestión para talleres de motocicletas en Colombia</p>
+        <p className="text-sm text-[#6e7681] mt-0.5">FactuX — Sistema de gestión para talleres de motocicletas en Colombia</p>
       </div>
 
       {/* Quick nav */}

@@ -102,7 +102,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Órdenes de Servicio</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-02 · HU-03 · Registro y cálculo automático de órdenes</p>
+          <p className="text-sm text-[#6e7681] mt-0.5">Órdenes de servicio: registre la moto, los trabajos y los repuestos</p>
         </div>
         {canCreateOrders(userRole) && (
           <Button onClick={() => setFormOpen(true)} icon={<span className="text-base leading-none">+</span>}>

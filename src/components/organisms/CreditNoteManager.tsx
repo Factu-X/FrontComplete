@@ -75,8 +75,8 @@ export default function CreditNoteManager({ session, addToast }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-[#e6edf3]">Notas Crédito</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-08 · Anulación o corrección de facturas validadas</p>
+          <h1 className="text-xl font-bold text-[#e6edf3]">Notas crédito</h1>
+          <p className="text-sm text-[#6e7681] mt-0.5">Anule o corrija una factura ya aceptada por la DIAN</p>
         </div>
         <Button onClick={() => setFormOpen(true)} icon={<span className="text-base leading-none">+</span>}>Nueva nota crédito</Button>
       </div>

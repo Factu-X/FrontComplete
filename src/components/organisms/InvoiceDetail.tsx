@@ -162,7 +162,7 @@ export default function InvoiceDetail({ facturaId, session, addToast, onChanged 
 
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex flex-col gap-1 text-xs text-[#8b949e] sm:max-w-xs">
-          <span className="uppercase tracking-wider text-[#6e7681]">CUFE</span>
+          <span title="Código que la DIAN asigna a la factura cuando la acepta" className="uppercase tracking-wider text-[#6e7681]">CUFE</span>
           <span className="font-mono break-all">{factura.cufe ?? 'Se genera al enviar la factura a la DIAN'}</span>
         </div>
         <div className="flex flex-col gap-1 w-full sm:w-72">

@@ -141,7 +141,7 @@ export default function BillingDashboard({ session, addToast }: Props) {
   const kpis = [
     { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · ${t?.ordenesFinalizadas ?? 0} órdenes finalizadas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
     { label: 'Neto (− notas crédito)', value: formatCOP(t?.neto ?? 0), sub: `Notas crédito ${formatCOP(t?.notasCredito ?? 0)}`, color: 'text-[#e6edf3]' },
-    { label: 'Recaudado en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
+    { label: 'Dinero recibido en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
     { label: 'Por cobrar hoy', value: formatCOP(reporte?.cartera.porCobrar ?? 0), sub: `Vencido ${formatCOP(reporte?.cartera.vencido ?? 0)}`, color: 'text-yellow-400' },
   ];
 
@@ -152,8 +152,8 @@ export default function BillingDashboard({ session, addToast }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-[#e6edf3]">Resumen de facturación</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-09 · Ventas, notas crédito, recaudo y cartera del periodo</p>
+          <h1 className="text-xl font-bold text-[#e6edf3]">Ingresos y reportes</h1>
+          <p className="text-sm text-[#6e7681] mt-0.5">Elija las fechas para ver cuánto facturó y cuánto dinero entró</p>
         </div>
         <Button variant="secondary" onClick={exportar} disabled={!reporte}>Exportar CSV</Button>
       </div>
@@ -277,7 +277,7 @@ export default function BillingDashboard({ session, addToast }: Props) {
           </dl>
         </section>
         <section className={seccion}>
-          <h2 className={tituloSeccion}>Cartera por antigüedad <span className="font-normal text-xs text-[#6e7681]">(hoy)</span></h2>
+          <h2 className={tituloSeccion}>Por cobrar según días de atraso <span className="font-normal text-xs text-[#6e7681]">(hoy)</span></h2>
           <dl className="flex flex-col gap-1.5 text-sm">
             {(Object.keys(ANTIGUEDAD_LABELS) as Antiguedad[]).map(a => (
               <div key={a} className="flex justify-between"><dt className="text-[#8b949e]">{ANTIGUEDAD_LABELS[a]}</dt><dd className="font-mono text-[#e6edf3]">{formatCOP(reporte?.cartera.porAntiguedad[a] ?? 0)}</dd></div>

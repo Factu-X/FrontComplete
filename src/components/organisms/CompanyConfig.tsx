@@ -167,7 +167,7 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'empresa', label: 'Datos empresa', icon: '⊙' },
-    { id: 'numeracion', label: 'Numeración DIAN', icon: '≡' },
+    { id: 'numeracion', label: 'Numeración de facturas (DIAN)', icon: '≡' },
     // HU-13: las credenciales y el certificado no son visibles para Facturación.
     ...(canEdit ? [{ id: 'dian' as Tab, label: 'Credenciales DIAN', icon: '◈' }] : []),
   ];
@@ -178,7 +178,7 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Configuración de Empresa y DIAN</h1>
           <p className="text-sm text-[#6e7681] mt-0.5">
-            HU-13 · Parámetros fiscales y de facturación electrónica{!canEdit && ' · Solo consulta'}
+            Datos fiscales de la empresa para emitir facturas electrónicas{!canEdit && ' · Solo consulta'}
           </p>
         </div>
         <Badge variant={estado.puedeEmitir ? 'active' : 'warning'}>
@@ -196,7 +196,7 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
           )}
           {estado.faltantesTransmision.length > 0 && (
             <div>
-              <div className="text-sm font-semibold text-yellow-300">⚠ No se podrán transmitir a la DIAN (HU-07)</div>
+              <div className="text-sm font-semibold text-yellow-300">⚠ No se podrán enviar facturas a la DIAN</div>
               <div className="text-xs text-yellow-400/80">Falta: {estado.faltantesTransmision.join(', ')}</div>
             </div>
           )}
@@ -367,7 +367,7 @@ export default function CompanyConfigPage({ session, userRole, addToast, onChang
               <div className="text-sm">
                 {credenciales.certificadoCargado
                   ? <span className="text-emerald-400">✓ Certificado cargado · vence {credenciales.certificadoExpira}</span>
-                  : <span className="text-[#6e7681]">Sin certificado. Se necesita para firmar y transmitir (HU-07).</span>}
+                  : <span className="text-[#6e7681]">Sin certificado. Se necesita para firmar y enviar las facturas.</span>}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <label htmlFor="certificate-file" className="flex flex-col gap-1 text-xs text-[#8b949e]">

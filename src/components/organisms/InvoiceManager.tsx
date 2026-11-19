@@ -80,7 +80,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
         <div className="font-mono text-xs text-[#6e7681]">{f.orden.motocicleta.placa} · {f.orden.numero}</div>
       </div>
     )},
-    { key: 'pago', header: 'Pago', render: (f: BackendFactura) => (
+    { key: 'pago', header: 'Forma de pago', render: (f: BackendFactura) => (
       <span className="text-xs text-[#8b949e]">{FORMA_PAGO_LABELS[f.formaPago]}</span>
     )},
     { key: 'total', header: 'Total', render: (f: BackendFactura) => (
@@ -108,8 +108,8 @@ export default function InvoiceManager({ session, addToast }: Props) {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-[#e6edf3]">Facturación</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-06 · Factura generada desde la orden finalizada</p>
+          <h1 className="text-xl font-bold text-[#e6edf3]">Facturas</h1>
+          <p className="text-sm text-[#6e7681] mt-0.5">Facturas emitidas a sus clientes. Para facturar una orden finalizada, use «Facturar orden»</p>
         </div>
         <Button
           onClick={() => setFormOpen(true)}
@@ -150,7 +150,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
         </div>
       </div>
 
-      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando facturas...' : 'No se encontraron facturas'} />
+      <DataTable columns={columns} data={filtered} emptyMessage={loading ? 'Cargando facturas...' : 'Aún no hay facturas. Use «Facturar orden» para crear la primera desde una orden finalizada.'} />
 
       <Modal title="Facturar orden de servicio" open={formOpen} onClose={() => setFormOpen(false)} width="max-w-3xl">
         {formOpen && (

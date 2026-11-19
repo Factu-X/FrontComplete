@@ -259,7 +259,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Catálogo de Servicios y Repuestos</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-01 · Gestión del catálogo comercial del taller</p>
+          <p className="text-sm text-[#6e7681] mt-0.5">Servicios y repuestos que se cobran en las órdenes de trabajo</p>
         </div>
         {canWrite && <Button onClick={openCreate} icon={<span className="text-base leading-none">+</span>}>Nuevo elemento</Button>}
       </div>
@@ -292,7 +292,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
         ))}
       </div>
 
-      <DataTable columns={columns} data={items} emptyMessage={loading ? 'Cargando catálogo...' : 'No se encontraron elementos'} />
+      <DataTable columns={columns} data={items} emptyMessage={loading ? 'Cargando catálogo...' : 'Aún no hay elementos en el catálogo. Use «Nuevo elemento» para agregar el primero.'} />
 
       <Modal
         title={editing ? 'Editar elemento del catálogo' : 'Nuevo elemento del catálogo'}
@@ -347,7 +347,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
-              label="Tratamiento IVA *"
+              label="Tratamiento IVA *" title="Gravado: lleva IVA. Exento: IVA 0 %, sí se factura. Excluido: no lleva IVA"
               options={ivaOptions}
               value={form.ivaTreatment}
               onChange={e => setForm(f => ({ ...f, ivaTreatment: e.target.value as TratamientoIva, taxRate: [19, 5].includes(f.taxRate) ? f.taxRate : 19 }))}

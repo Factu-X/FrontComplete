@@ -215,7 +215,7 @@ export default function UserManager({ addToast, session, currentUserId }: Props)
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-[#e6edf3]">Gestión de Usuarios</h1>
-          <p className="text-sm text-[#6e7681] mt-0.5">HU-12 · Control de acceso y roles del sistema</p>
+          <p className="text-sm text-[#6e7681] mt-0.5">Quién puede entrar a FactuX y qué puede hacer cada usuario</p>
         </div>
         <Button onClick={openCreate} icon={<span className="text-base leading-none">+</span>}>Nuevo usuario</Button>
       </div>
