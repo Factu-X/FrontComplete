@@ -4,6 +4,7 @@ import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
+import type { Page } from './Sidebar';
 import type { BackendCliente, BackendMotocicleta, BackendOrden } from '../../lib/types';
 
 interface Props {
@@ -11,9 +12,10 @@ interface Props {
   addToast: (t: Omit<ToastItem, 'id'>) => void;
   onCreated: (orden: BackendOrden) => void;
   onCancel: () => void;
+  onNavigate?: (page: Page) => void;
 }
 
-export default function OrderForm({ session, addToast, onCreated, onCancel }: Props) {
+export default function OrderForm({ session, addToast, onCreated, onCancel, onNavigate }: Props) {
   const [customers, setCustomers] = useState<BackendCliente[]>([]);
   const [motorcycles, setMotorcycles] = useState<BackendMotocicleta[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -112,6 +114,14 @@ export default function OrderForm({ session, addToast, onCreated, onCancel }: Pr
           disabled={!customerId}
           error={errors.motorcycle}
         />
+        {customerId && motorcycles.length === 0 && (
+          <div className="sm:col-start-2 text-xs text-yellow-400">
+            Este cliente no tiene motos.{' '}
+            {onNavigate
+              ? <button type="button" className="underline hover:text-yellow-300" onClick={() => onNavigate('customers')}>Registre la moto en Clientes</button>
+              : 'Registre la moto en Clientes'}
+          </div>
+        )}
       </div>
 
       <Input

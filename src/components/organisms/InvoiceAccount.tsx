@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
-import Select from '../atoms/Select';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiSession } from '../../lib/api';
 import { AJUSTE_LABELS, ANTIGUEDAD_LABELS, DIAN_LABELS, METODO_LABELS, PAGO_BADGE, PAGO_LABELS } from '../../lib/invoices';
@@ -101,7 +100,7 @@ export default function InvoiceAccount({ facturaId, session, addToast, onChanged
       <div className="text-xs text-[#6e7681]">Vence el {cuenta.vencimiento}. Solo las notas crédito validadas por la DIAN reducen el saldo.</div>
 
       {saldo > 0 && !formOpen && (
-        <div><Button size="sm" variant="outline" onClick={() => { setMonto(String(saldo)); setFormOpen(true); }}>Registrar pago</Button></div>
+        <div><Button size="sm" variant="primary" onClick={() => { setMonto(String(saldo)); setFormOpen(true); }}>Registrar pago</Button></div>
       )}
 
       {formOpen && (
@@ -117,7 +116,20 @@ export default function InvoiceAccount({ facturaId, session, addToast, onChanged
             error={montoInvalido ? `Debe ser mayor que cero y máximo ${formatCOP(saldo)}` : undefined}
             onChange={e => setMonto(e.target.value)}
           />
-          <Select id="pago-metodo" label="Método *" value={metodo} onChange={e => setMetodo(e.target.value as MetodoPago)} options={metodoOptions} />
+          <div className="flex flex-col gap-1" role="group" aria-labelledby="pago-metodo">
+            <span id="pago-metodo" className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">¿Cómo le pagaron? *</span>
+            <div className="flex flex-wrap gap-1.5">
+              {metodoOptions.map(o => (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={metodo === o.value}
+                  onClick={() => setMetodo(o.value)}
+                  className={`px-3 py-2 rounded-[6px] text-sm border transition-colors ${metodo === o.value ? 'bg-[#f97316] border-[#f97316] text-[#0d1117] font-semibold' : 'border-[#30363d] text-[#8b949e] hover:bg-[#21262d]'}`}
+                >{o.label}</button>
+              ))}
+            </div>
+          </div>
           <Input id="pago-fecha" label="Fecha" type="date" max={todayISO()} value={fecha} onChange={e => setFecha(e.target.value)} />
           <Input id="pago-ref" label="Referencia" placeholder="N° de transferencia o recibo" value={referencia} onChange={e => setReferencia(e.target.value)} />
           <div className="sm:col-span-2 flex justify-end gap-2">

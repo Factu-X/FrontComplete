@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
+import Input from '../atoms/Input';
+import Select from '../atoms/Select';
 import MotorcycleHistory from './MotorcycleHistory';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
 import {
   formatCOP, isOrderEditable, nextStates, STATUS_BADGE, STATUS_LABELS, subtotalsByType, toNumber,
 } from '../../lib/orders';
-import { canCancelOrders } from '../../lib/roles';
+import { ordersPendingInvoice } from '../../lib/invoices';
+import { canCancelOrders, canInvoice } from '../../lib/roles';
 import type {
-  BackendCatalogItem, BackendDetalleOrden, BackendOrden, EstadoOrden, UserRole,
+  BackendCatalogItem, BackendDetalleOrden, BackendFactura, BackendOrden, EstadoOrden, RepuestoTercero, TratamientoIva, UserRole,
 } from '../../lib/types';
 
 const ACTION_LABELS: Record<EstadoOrden, string> = {
@@ -27,9 +30,18 @@ interface Props {
   readOnly?: boolean;
   compact?: boolean;
   onChanged?: () => void;
+  // Lleva a la pantalla de facturas con esta orden elegida.
+  onInvoiceOrder?: (orderId: string) => void;
 }
 
-export default function OrderDetail({ orderId, session, addToast, userRole, readOnly = false, compact = false, onChanged }: Props) {
+const IVA_TERCERO: { value: string; label: string; tratamiento: TratamientoIva; tarifa?: number }[] = [
+  { value: 'GRAVADO', label: 'Con IVA 19 %', tratamiento: 'GRAVADO', tarifa: 19 },
+  { value: 'EXENTO', label: 'Exento de IVA', tratamiento: 'EXENTO' },
+  { value: 'EXCLUIDO', label: 'Sin IVA (excluido)', tratamiento: 'EXCLUIDO' },
+];
+const emptyTercero = { descripcion: '', proveedor: '', precio: '', cantidad: '1', iva: 'GRAVADO' };
+
+export default function OrderDetail({ orderId, session, addToast, userRole, readOnly = false, compact = false, onChanged, onInvoiceOrder }: Props) {
   const [order, setOrder] = useState<BackendOrden | null>(null);
   const [items, setItems] = useState<BackendDetalleOrden[]>([]);
   const [catalog, setCatalog] = useState<BackendCatalogItem[]>([]);
@@ -37,6 +49,11 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [terceroOpen, setTerceroOpen] = useState(false);
+  const [tercero, setTercero] = useState(emptyTercero);
+  const [terceroErrors, setTerceroErrors] = useState<Record<string, string>>({});
+  // null = no se sabe todavía si la orden ya tiene factura.
+  const [invoiced, setInvoiced] = useState<boolean | null>(null);
 
   const editable = !readOnly && !!order && isOrderEditable(order.estado);
 
@@ -65,6 +82,14 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
       .catch(() => addToast({ message: 'No se pudo cargar el catálogo', type: 'error' }));
   }, [editable]);
 
+  const canBill = canInvoice(userRole);
+  useEffect(() => {
+    if (!order || order.estado !== 'FINALIZADA' || !canBill || !onInvoiceOrder) return;
+    apiRequest<ApiListResponse<BackendFactura>>('/facturas?limit=200', session)
+      .then(response => setInvoiced(ordersPendingInvoice([order], response.data).length === 0))
+      .catch(() => setInvoiced(null));
+  }, [order?.id, order?.estado, canBill]);
+
   // Toda mutación recarga la orden: los totales oficiales siempre vienen del backend (HU-03).
   async function mutate(path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: object, success?: string) {
     setBusy(true);
@@ -86,6 +111,32 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
     if (existing) return changeQty(existing, toNumber(existing.cantidad) + 1);
     return mutate(`/ordenes/${orderId}/detalles`, 'POST', { itemCatalogoId: item.id, cantidad: 1 });
   };
+
+  async function addTercero() {
+    const e: Record<string, string> = {};
+    const precio = Number(tercero.precio);
+    const cantidad = Number(tercero.cantidad);
+    if (tercero.descripcion.trim().length < 2) e.descripcion = 'Escriba qué repuesto es';
+    if (!tercero.proveedor.trim()) e.proveedor = 'Escriba a quién se le compró';
+    if (!(precio > 0)) e.precio = 'El precio debe ser mayor a 0';
+    if (!(cantidad > 0)) e.cantidad = 'La cantidad debe ser mayor a 0';
+    setTerceroErrors(e);
+    if (Object.keys(e).length) return;
+    const iva = IVA_TERCERO.find(o => o.value === tercero.iva)!;
+    const body: { tercero: RepuestoTercero; cantidad: number } = {
+      tercero: {
+        descripcion: tercero.descripcion.trim(),
+        proveedor: tercero.proveedor.trim(),
+        precio,
+        tratamientoIva: iva.tratamiento,
+        ...(iva.tarifa ? { tarifaIva: iva.tarifa } : {}),
+      },
+      cantidad,
+    };
+    await mutate(`/ordenes/${orderId}/detalles`, 'POST', body, 'Repuesto de tercero agregado');
+    setTercero(emptyTercero);
+    setTerceroOpen(false);
+  }
 
   const changeQty = (item: BackendDetalleOrden, cantidad: number) =>
     cantidad >= 1 && mutate(`/ordenes/${orderId}/detalles/${item.id}`, 'PATCH', { cantidad });
@@ -177,6 +228,23 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
               placeholder="Buscar en catálogo activo..."
               className="w-full bg-[#0d1117] border border-[#30363d] rounded-[6px] px-3 py-2 text-sm text-[#e6edf3] placeholder-[#6e7681] focus:outline-none focus:border-[#f97316] mb-2"
             />
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setTerceroOpen(o => !o)}>+ Repuesto de tercero</Button>
+              <span className="text-xs text-[#6e7681]">Use esto cuando el repuesto lo consiguió con otro taller o distribuidor</span>
+            </div>
+            {terceroOpen && (
+              <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#0d1117] border border-[#30363d] rounded-[6px] p-3">
+                <Input id="tercero-desc" label="Qué repuesto es *" placeholder="Bujía NGK" value={tercero.descripcion} error={terceroErrors.descripcion} onChange={e => setTercero(t => ({ ...t, descripcion: e.target.value }))} />
+                <Input id="tercero-prov" label="A quién se le compró *" placeholder="Taller Pepe" value={tercero.proveedor} error={terceroErrors.proveedor} onChange={e => setTercero(t => ({ ...t, proveedor: e.target.value }))} />
+                <Input id="tercero-precio" label="Precio *" type="number" min={0} value={tercero.precio} error={terceroErrors.precio} onChange={e => setTercero(t => ({ ...t, precio: e.target.value }))} />
+                <Input id="tercero-cant" label="Cantidad" type="number" min={1} value={tercero.cantidad} error={terceroErrors.cantidad} onChange={e => setTercero(t => ({ ...t, cantidad: e.target.value }))} />
+                <Select id="tercero-iva" label="IVA" options={IVA_TERCERO} value={tercero.iva} onChange={e => setTercero(t => ({ ...t, iva: e.target.value }))} />
+                <div className="sm:col-span-2 flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setTerceroOpen(false)}>Cancelar</Button>
+                  <Button size="sm" loading={busy} onClick={addTercero}>Agregar repuesto</Button>
+                </div>
+              </div>
+            )}
             <div className="max-h-40 overflow-y-auto flex flex-col gap-1">
               {filteredCatalog.length === 0 && (
                 <div className="text-xs text-[#6e7681] px-2 py-3 text-center">Sin resultados en catálogo activo</div>
@@ -233,6 +301,7 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
                       <div>
                         <div className="font-medium text-[#e6edf3]">{item.nombreItem}</div>
                         <div className="font-mono text-[#6e7681]">{item.codigoItem}</div>
+                        {item.proveedorTercero && <Badge variant="warning">Tercero · {item.proveedorTercero}</Badge>}
                       </div>
                     </div>
                   </td>
@@ -282,6 +351,13 @@ export default function OrderDetail({ orderId, session, addToast, userRole, read
           <span className="text-[#e6edf3]">Total general</span>
           <span className="font-mono text-[#f97316] text-lg">{formatCOP(order.total)}</span>
         </div>
+        {order.estado === 'FINALIZADA' && invoiced !== true && onInvoiceOrder && (
+          <div className="pt-1">
+            {canBill
+              ? <Button onClick={() => onInvoiceOrder(order.id)}>Facturar esta orden</Button>
+              : <span className="text-sm text-yellow-400">Lista para facturar: avise a quien factura</span>}
+          </div>
+        )}
         {order.estado === 'FINALIZADA' && (
           <div className="pt-1 text-xs text-[#6e7681] flex items-center gap-1.5">
             <span className="text-emerald-400">✓</span>

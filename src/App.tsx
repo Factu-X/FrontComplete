@@ -31,6 +31,7 @@ const RemindersManager = lazyScreen(() => import('./components/organisms/Reminde
 const InvoiceManager = lazyScreen(() => import('./components/organisms/InvoiceManager'));
 const CreditNoteManager = lazyScreen(() => import('./components/organisms/CreditNoteManager'));
 const AccountsReceivable = lazyScreen(() => import('./components/organisms/AccountsReceivable'));
+const PaymentsManager = lazyScreen(() => import('./components/organisms/PaymentsManager'));
 const BillingDashboard = lazyScreen(() => import('./components/organisms/BillingDashboard'));
 const CompanyConfigPage = lazyScreen(() => import('./components/organisms/CompanyConfig'));
 const UserManager = lazyScreen(() => import('./components/organisms/UserManager'));
@@ -42,6 +43,8 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [page, setPage] = useState<Page>('dashboard');
+  // Orden que se quiere facturar: la pantalla de facturas abre el formulario con ella elegida.
+  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const [pendingReminders, setPendingReminders] = useState(0);
@@ -223,14 +226,22 @@ export default function App() {
               session={session}
             />
           )}
-          {canView('orders') && <OrderManager session={session} userRole={role} addToast={addToast} />}
+          {canView('orders') && (
+            <OrderManager
+              session={session}
+              userRole={role}
+              addToast={addToast}
+              onInvoiceOrder={id => { setInvoiceOrderId(id); setPage('invoices'); }}
+              onNavigate={setPage}
+            />
+          )}
           {canView('catalog') && <CatalogManager session={session} userRole={role} addToast={addToast} />}
           {canView('customers') && <CustomerManager session={session} addToast={addToast} />}
           {canView('reminders') && (
             <RemindersManager session={session} addToast={addToast} onChanged={() => refreshReminders(auth.token)} />
           )}
           {canView('invoices') && (
-            <InvoiceManager session={session} addToast={addToast} />
+            <InvoiceManager session={session} addToast={addToast} openOrderId={invoiceOrderId} onOpenHandled={() => setInvoiceOrderId(null)} />
           )}
           {canView('credit-notes') && (
             <CreditNoteManager session={session} addToast={addToast} />
@@ -238,8 +249,9 @@ export default function App() {
           {canView('receivables') && (
             <AccountsReceivable session={session} addToast={addToast} onChanged={() => refreshOverdue(auth.token)} />
           )}
+          {canView('payments') && <PaymentsManager session={session} addToast={addToast} />}
           {canView('billing-dashboard') && (
-            <BillingDashboard session={session} addToast={addToast} />
+            <BillingDashboard session={session} addToast={addToast} onNavigate={setPage} />
           )}
           {canView('settings') && (
             <CompanyConfigPage

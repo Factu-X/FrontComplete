@@ -9,6 +9,7 @@ import SearchBar from '../molecules/SearchBar';
 import ConfirmDialog from '../molecules/ConfirmDialog';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiSession, ApiListResponse, ApiEntityResponse } from '../../lib/api';
+import { IVA_LABELS } from '../../lib/invoices';
 import { formatCOP } from '../../lib/orders';
 import { canManageCatalog } from '../../lib/roles';
 import type { BackendCatalogItem, TratamientoIva, UserRole } from '../../lib/types';
@@ -238,7 +239,7 @@ export default function CatalogManager({ addToast, session, userRole }: Props) {
     )},
     { key: 'iva', header: 'IVA', render: (r: CatalogItem) => (
       <span className="font-mono text-xs text-[#8b949e]">
-        {r.ivaTreatment === 'GRAVADO' ? `${r.taxRate}%` : r.ivaTreatment.toLowerCase()}
+        {r.ivaTreatment === 'GRAVADO' ? `${r.taxRate}%` : IVA_LABELS[r.ivaTreatment]}
       </span>
     )},
     { key: 'active', header: 'Estado', render: (r: CatalogItem) => (

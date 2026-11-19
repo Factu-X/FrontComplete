@@ -22,9 +22,12 @@ const statusFilterOptions: [EstadoDian | 'all', string][] = [
 interface Props {
   session: ApiSession;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  // Orden que llega desde su detalle para facturarla: se abre el formulario con ella elegida.
+  openOrderId?: string | null;
+  onOpenHandled?: () => void;
 }
 
-export default function InvoiceManager({ session, addToast }: Props) {
+export default function InvoiceManager({ session, addToast, openOrderId = null, onOpenHandled }: Props) {
   const [facturas, setFacturas] = useState<BackendFactura[]>([]);
   const [ordenes, setOrdenes] = useState<BackendOrden[]>([]);
   const [bloqueo, setBloqueo] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
   const [filterStatus, setFilterStatus] = useState<EstadoDian | 'all'>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [preselectId, setPreselectId] = useState<string | undefined>();
 
   async function load() {
     try {
@@ -55,6 +59,15 @@ export default function InvoiceManager({ session, addToast }: Props) {
   useEffect(() => {
     void load();
   }, [session.token]);
+
+  useEffect(() => {
+    if (!openOrderId || loading) return;
+    if (!bloqueo) {
+      setPreselectId(openOrderId);
+      setFormOpen(true);
+    }
+    onOpenHandled?.();
+  }, [openOrderId, loading]);
 
   const pendingOrders = ordersPendingInvoice(ordenes, facturas);
   const filtered = facturas.filter(f =>
@@ -157,6 +170,7 @@ export default function InvoiceManager({ session, addToast }: Props) {
           <InvoiceForm
             session={session}
             pendingOrders={pendingOrders}
+            initialOrderId={preselectId}
             addToast={addToast}
             onCreated={factura => handleCreated(factura.id)}
             onCancel={() => setFormOpen(false)}

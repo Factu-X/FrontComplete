@@ -1,3 +1,5 @@
+import type { PagosRecibidos } from './types';
+
 export type ApiSession = {
   token: string;
 };
@@ -106,3 +108,11 @@ export type ApiEntityResponse<T> = {
 
 export const apiDownload = async (path: string, session: ApiSession, fileName: string) =>
   saveBlob(await apiBlob(path, session), fileName);
+
+
+// Pagos recibidos: todos los filtros son opcionales; el backend usa el mes actual por defecto.
+export const getPagosRecibidos = async (session: ApiSession, filtros: { desde?: string; hasta?: string; metodo?: string } = {}) => {
+  const query = new URLSearchParams(Object.entries(filtros).filter(([, v]) => v) as [string, string][]).toString();
+  const response = await apiRequest<ApiEntityResponse<PagosRecibidos>>(`/cartera/pagos${query ? `?${query}` : ''}`, session);
+  return response.data;
+};

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, apiRequest, setUnauthorizedHandler } from './api';
+import { ApiError, apiRequest, getPagosRecibidos, setUnauthorizedHandler } from './api';
 
 const mockFetch = (status: number, body: string) =>
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -84,5 +84,21 @@ describe('apiRequest', () => {
     await expect(apiRequest('https://evil.example', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
     await expect(apiRequest('/facturas/../usuarios', { token: 'jwt' })).rejects.toThrow('Ruta de API inválida');
     await expect(apiRequest('/reportes/facturacion?desde=2026-10-01&hasta=2026-10-31', { token: 'jwt' })).resolves.toEqual({ data: [] });
+  });
+});
+
+describe('getPagosRecibidos', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('envia solo los filtros que tienen valor y devuelve el contenido de data', async () => {
+    mockFetch(200, JSON.stringify({ data: { pagos: [] } }));
+    await expect(getPagosRecibidos({ token: 'jwt' }, { desde: '2026-11-01', hasta: '', metodo: 'TARJETA' })).resolves.toEqual({ pagos: [] });
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toMatch(/\/cartera\/pagos\?desde=2026-11-01&metodo=TARJETA$/);
+  });
+
+  it('sin filtros consulta sin parametros', async () => {
+    mockFetch(200, JSON.stringify({ data: {} }));
+    await getPagosRecibidos({ token: 'jwt' });
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toMatch(/\/cartera\/pagos$/);
   });
 });

@@ -52,7 +52,7 @@ export default function DashboardPage({ userRole, userName, onNavigate, session 
           { label: 'Órdenes abiertas', value: openOrders.length, sub: 'requieren atención', accent: '#f97316', icon: '⊞', page: 'orders' },
           { label: 'Clientes registrados', value: customers.filter(c => c.activo).length, sub: 'clientes activos', accent: '#34d399', icon: '◎', page: 'customers' },
           { label: 'Catálogo activo', value: catalog.length, sub: 'servicios y repuestos', accent: '#60a5fa', icon: '≡', page: 'catalog' },
-          { label: 'Ingresos finalizados', value: formatCOP(totalRevenue), sub: `${finishedOrders.length} órdenes`, accent: '#a78bfa', icon: '₡', page: 'orders' },
+          { label: 'Valor de órdenes finalizadas', value: formatCOP(totalRevenue), sub: `${finishedOrders.length} órdenes`, accent: '#a78bfa', icon: '₡', page: 'orders' },
         ].filter(kpi => canAccessPage(userRole, kpi.page)).map(kpi => (
           <button
             key={kpi.label}
@@ -121,6 +121,9 @@ export default function DashboardPage({ userRole, userName, onNavigate, session 
               canCreateOrders(userRole)
                 ? { label: 'Nueva orden de servicio', desc: 'Registrar atención a un vehículo', page: 'orders', color: '#f97316' }
                 : { label: 'Trabajar órdenes', desc: 'Actualizar estado, servicios y repuestos', page: 'orders', color: '#f97316' },
+              { label: 'Cobrar / registrar pago', desc: 'Facturas con saldo por cobrar', page: 'receivables', color: '#fbbf24' },
+              { label: 'Pagos recibidos', desc: 'Dinero que ya entró, por fechas', page: 'payments', color: '#34d399' },
+              { label: 'Ver ingresos por fechas', desc: 'Cuánto facturó y cuánto recibió', page: 'billing-dashboard', color: '#a78bfa' },
               { label: 'Registrar cliente', desc: 'Agregar cliente y motocicleta', page: 'customers', color: '#34d399' },
               { label: 'Actualizar catálogo', desc: 'Servicios y repuestos', page: 'catalog', color: '#60a5fa' },
               { label: 'Gestionar usuarios', desc: 'Control de acceso y roles', page: 'users', color: '#a78bfa' },

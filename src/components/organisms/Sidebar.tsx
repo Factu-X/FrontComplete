@@ -4,7 +4,7 @@ import type { UserRole } from '../../lib/types';
 
 export type Page =
   | 'dashboard' | 'orders' | 'catalog' | 'customers'
-  | 'reminders' | 'invoices' | 'credit-notes' | 'receivables' | 'billing-dashboard'
+  | 'reminders' | 'invoices' | 'credit-notes' | 'receivables' | 'payments' | 'billing-dashboard'
   | 'settings' | 'users' | 'usability' | 'help';
 
 interface NavItem {
@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { id: 'invoices', label: 'Facturas', icon: '₡', group: 'ops' },
   { id: 'credit-notes', label: 'Notas crédito', icon: '↩', group: 'ops' },
   { id: 'receivables', label: 'Por cobrar', icon: '◑', group: 'ops' },
+  { id: 'payments', label: 'Pagos recibidos', icon: '$', group: 'ops' },
   { id: 'billing-dashboard', label: 'Ingresos y reportes', icon: '▤', group: 'ops' },
   { id: 'settings', label: 'Configuración', icon: '⚙', group: 'admin' },
   { id: 'users', label: 'Usuarios', icon: '⊙', group: 'admin' },

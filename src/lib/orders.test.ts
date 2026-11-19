@@ -7,6 +7,7 @@ const detalle = (tipoItem: BackendDetalleOrden['tipoItem'], subtotal: string): B
   id: subtotal,
   ordenId: 'o-1',
   itemCatalogoId: 'i-1',
+  proveedorTercero: null,
   codigoItem: 'X',
   nombreItem: 'Item',
   tipoItem,

@@ -3,13 +3,14 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiEntityResponse, ApiListResponse, ApiSession } from '../../lib/api';
-import { groupTaxes } from '../../lib/invoices';
+import { groupTaxes, IVA_LABELS } from '../../lib/invoices';
 import { formatCOP } from '../../lib/orders';
 import type { BackendDetalleOrden, BackendFacturaCompleta, BackendOrden, FormaPago } from '../../lib/types';
 
 interface Props {
   session: ApiSession;
   pendingOrders: BackendOrden[];
+  initialOrderId?: string;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
   onCreated: (factura: BackendFacturaCompleta) => void;
   onCancel: () => void;
@@ -17,10 +18,8 @@ interface Props {
 
 const todayISO = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
 
-const IVA_LABELS: Record<string, string> = { GRAVADO: 'con IVA', EXENTO: 'exento de IVA', EXCLUIDO: 'sin IVA (excluido)' };
-
-export default function InvoiceForm({ session, pendingOrders, addToast, onCreated, onCancel }: Props) {
-  const [ordenId, setOrdenId] = useState(pendingOrders[0]?.id ?? '');
+export default function InvoiceForm({ session, pendingOrders, initialOrderId, addToast, onCreated, onCancel }: Props) {
+  const [ordenId, setOrdenId] = useState(pendingOrders.find(o => o.id === initialOrderId)?.id ?? pendingOrders[0]?.id ?? '');
   const [detalles, setDetalles] = useState<BackendDetalleOrden[]>([]);
   const [loadingDetalles, setLoadingDetalles] = useState(false);
   const [formaPago, setFormaPago] = useState<FormaPago>('CONTADO');

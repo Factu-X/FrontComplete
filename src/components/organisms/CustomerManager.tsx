@@ -157,7 +157,7 @@ export default function CustomerManager({ addToast, session }: Props) {
     return e;
   }
 
-  async function handleSaveCustomer() {
+  async function handleSaveCustomer(thenAddMoto = false) {
     const e = validateCustomer();
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
@@ -185,8 +185,10 @@ export default function CustomerManager({ addToast, session }: Props) {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        setCustomers(prev => [mapCustomer(response.data, []), ...prev]);
+        const created = mapCustomer(response.data, []);
+        setCustomers(prev => [created, ...prev]);
         addToast({ message: 'Cliente registrado exitosamente', type: 'success' });
+        if (thenAddMoto) openAddMoto(created);
       }
       setModalOpen(false);
       void loadCustomers();
@@ -351,7 +353,7 @@ export default function CustomerManager({ addToast, session }: Props) {
         title={editingCustomer ? 'Editar cliente' : 'Registrar cliente'}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onConfirm={handleSaveCustomer}
+        onConfirm={() => handleSaveCustomer()}
         loading={saving}
       >
         <div className="flex flex-col gap-4">
@@ -396,6 +398,11 @@ export default function CustomerManager({ addToast, session }: Props) {
               placeholder="correo@ejemplo.com"
             />
           </div>
+          {!editingCustomer && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" loading={saving} onClick={() => handleSaveCustomer(true)}>Guardar y agregar moto</Button>
+            </div>
+          )}
         </div>
       </Modal>
 

@@ -9,6 +9,7 @@ import OrderDetail from './OrderDetail';
 import { ToastItem } from '../molecules/ToastContainer';
 import { apiRequest, ApiListResponse, ApiSession } from '../../lib/api';
 import { formatCOP, isOrderEditable, matchesOrderSearch, STATUS_BADGE, STATUS_LABELS } from '../../lib/orders';
+import type { Page } from './Sidebar';
 import { canCreateOrders } from '../../lib/roles';
 import type { BackendOrden, EstadoOrden, UserRole } from '../../lib/types';
 
@@ -24,9 +25,11 @@ interface Props {
   session: ApiSession;
   userRole: UserRole;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  onInvoiceOrder?: (orderId: string) => void;
+  onNavigate?: (page: Page) => void;
 }
 
-export default function OrderManager({ session, userRole, addToast }: Props) {
+export default function OrderManager({ session, userRole, addToast, onInvoiceOrder, onNavigate }: Props) {
   const [orders, setOrders] = useState<BackendOrden[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -139,7 +142,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
 
       <Modal title="Nueva orden de servicio" open={formOpen} onClose={() => setFormOpen(false)} width="max-w-3xl">
         {formOpen && (
-          <OrderForm session={session} addToast={addToast} onCreated={handleCreated} onCancel={() => setFormOpen(false)} />
+          <OrderForm session={session} addToast={addToast} onNavigate={onNavigate} onCreated={handleCreated} onCancel={() => setFormOpen(false)} />
         )}
       </Modal>
 
@@ -155,6 +158,7 @@ export default function OrderManager({ session, userRole, addToast }: Props) {
             session={session}
             addToast={addToast}
             userRole={userRole}
+            onInvoiceOrder={onInvoiceOrder}
             onChanged={loadOrders}
           />
         </Modal>

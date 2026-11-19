@@ -25,7 +25,7 @@ const PAGES_BY_ROLE: Record<UserRole, readonly string[] | 'all'> = {
   admin: 'all',
   billing: [
     'dashboard', 'orders', 'customers', 'catalog', 'reminders', 'invoices',
-    'credit-notes', 'receivables', 'billing-dashboard', 'settings', 'help',
+    'credit-notes', 'receivables', 'payments', 'billing-dashboard', 'settings', 'help',
   ],
   operator: ['dashboard', 'orders', 'help'],
 };

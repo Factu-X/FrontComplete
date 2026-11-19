@@ -113,6 +113,10 @@ export default function InvoiceDetail({ facturaId, session, addToast, onChanged 
         </div>
       </div>
 
+      <div className="border-y border-[#30363d] py-4">
+        <InvoiceAccount facturaId={facturaId} session={session} addToast={addToast} onChanged={onChanged} />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="bg-[#0d1117] border border-[#30363d] rounded-[6px] px-4 py-3">
           <div className="text-xs text-[#6e7681] uppercase tracking-wider mb-1">Adquirente</div>
@@ -149,6 +153,7 @@ export default function InvoiceDetail({ facturaId, session, addToast, onChanged 
                 <td className="px-3 py-2 text-[#e6edf3]">
                   {d.descripcion}
                   {d.codigoItem && <span className="ml-2 font-mono text-xs text-[#6e7681]">{d.codigoItem}</span>}
+                  {d.proveedorTercero && <div className="mt-0.5"><Badge variant="warning">Tercero · {d.proveedorTercero}</Badge></div>}
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-xs text-[#8b949e]">{Number(d.cantidad)}</td>
                 <td className="hidden sm:table-cell px-3 py-2 text-right font-mono text-xs text-[#8b949e]">{formatCOP(d.precioUnitario)}</td>
@@ -177,10 +182,6 @@ export default function InvoiceDetail({ facturaId, session, addToast, onChanged 
             <span>Total</span><span className="font-mono text-[#f97316]">{formatCOP(factura.total)}</span>
           </div>
         </div>
-      </div>
-
-      <div className="border-t border-[#30363d] pt-4">
-        <InvoiceAccount facturaId={facturaId} session={session} addToast={addToast} onChanged={onChanged} />
       </div>
 
       <DianSubmissions envios={envios} />

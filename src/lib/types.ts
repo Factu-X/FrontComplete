@@ -84,7 +84,8 @@ export type BackendOrden = {
 export type BackendDetalleOrden = {
   id: string;
   ordenId: string;
-  itemCatalogoId: string;
+  itemCatalogoId: string | null;
+  proveedorTercero: string | null;
   codigoItem: string;
   nombreItem: string;
   tipoItem: 'SERVICIO' | 'REPUESTO';
@@ -129,6 +130,7 @@ export type BackendDetalleFactura = {
   id: string;
   codigoItem: string | null;
   descripcion: string;
+  proveedorTercero: string | null;
   cantidad: string;
   precioUnitario: string;
   tarifaIva: string;
@@ -431,3 +433,31 @@ export type ResumenUsabilidad = {
 };
 
 export type TareasBaseUsabilidad = { tareas: string[]; referenciaSus: number };
+
+// GET /cartera/pagos: dinero recibido en un rango, con totales por método.
+export type PagoRecibido = {
+  id: string;
+  fechaPago: string;
+  monto: string;
+  metodoPago: MetodoPago;
+  referencia: string | null;
+  observaciones: string | null;
+  factura: { id: string; numero: string };
+  cliente: { id: string; nombre: string };
+};
+
+export type PagosRecibidos = {
+  desde: string;
+  hasta: string;
+  pagos: PagoRecibido[];
+  totales: { total: string; porMetodo: Record<MetodoPago, string> };
+};
+
+// Repuesto conseguido con otro taller o distribuidor.
+export type RepuestoTercero = {
+  descripcion: string;
+  proveedor: string;
+  precio: number;
+  tratamientoIva: TratamientoIva;
+  tarifaIva?: number;
+};

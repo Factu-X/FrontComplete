@@ -111,6 +111,8 @@ export const METODO_LABELS: Record<MetodoPago, string> = {
   OTRO: 'Otro',
 };
 
+export const IVA_LABELS: Record<string, string> = { GRAVADO: 'con IVA', EXENTO: 'exento de IVA', EXCLUIDO: 'sin IVA (excluido)' };
+
 export const ANTIGUEDAD_LABELS: Record<Antiguedad, string> = {
   AL_DIA: 'Al día',
   D1_30: '1–30 días',

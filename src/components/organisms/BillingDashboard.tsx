@@ -6,6 +6,7 @@ import { apiRequest, ApiEntityResponse, ApiSession, saveBlob } from '../../lib/a
 import { ANTIGUEDAD_LABELS, DIAN_LABELS, FORMA_PAGO_LABELS, METODO_LABELS, toCsv } from '../../lib/invoices';
 import { formatCOP, toNumber } from '../../lib/orders';
 import { agruparSerie, compactCOP, escalaY, rangoPreset, type Preset, type Punto } from '../../lib/reports';
+import type { Page } from './Sidebar';
 import type { Antiguedad, EstadoDian, FormaPago, MetodoPago, ReporteFacturacion } from '../../lib/types';
 
 const presets: [Preset, string][] = [
@@ -22,6 +23,7 @@ const SURFACE = '#161b22';
 interface Props {
   session: ApiSession;
   addToast: (t: Omit<ToastItem, 'id'>) => void;
+  onNavigate?: (page: Page) => void;
 }
 
 // Columnas por día (o por mes en rangos largos). Una sola serie: el título la nombra, sin leyenda.
@@ -105,7 +107,7 @@ function RevenueChart({ puntos }: { puntos: Punto[] }) {
   );
 }
 
-export default function BillingDashboard({ session, addToast }: Props) {
+export default function BillingDashboard({ session, addToast, onNavigate }: Props) {
   const [preset, setPreset] = useState<Preset | 'custom'>('mes');
   const [rango, setRango] = useState(rangoPreset('mes'));
   const [reporte, setReporte] = useState<ReporteFacturacion | null>(null);
@@ -139,9 +141,9 @@ export default function BillingDashboard({ session, addToast }: Props) {
 
   const t = reporte?.totales;
   const kpis = [
+    { label: 'Dinero recibido en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
     { label: 'Facturado', value: formatCOP(t?.facturado ?? 0), sub: `${t?.facturas ?? 0} facturas · ${t?.ordenesFinalizadas ?? 0} órdenes finalizadas · IVA ${formatCOP(t?.iva ?? 0)}`, color: 'text-[#f97316]' },
     { label: 'Neto (− notas crédito)', value: formatCOP(t?.neto ?? 0), sub: `Notas crédito ${formatCOP(t?.notasCredito ?? 0)}`, color: 'text-[#e6edf3]' },
-    { label: 'Dinero recibido en el periodo', value: formatCOP(t?.recaudado ?? 0), sub: `Ticket promedio ${formatCOP(t?.ticketPromedio ?? 0)}`, color: 'text-emerald-400' },
     { label: 'Por cobrar hoy', value: formatCOP(reporte?.cartera.porCobrar ?? 0), sub: `Vencido ${formatCOP(reporte?.cartera.vencido ?? 0)}`, color: 'text-yellow-400' },
   ];
 
@@ -266,7 +268,10 @@ export default function BillingDashboard({ session, addToast }: Props) {
           </dl>
         </section>
         <section className={seccion}>
-          <h2 className={tituloSeccion}>Recaudo por método</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className={tituloSeccion}>Recaudo por método</h2>
+            {onNavigate && <button className="text-xs text-[#f97316] hover:underline" onClick={() => onNavigate('payments')}>Ver pagos</button>}
+          </div>
           <dl className="flex flex-col gap-1.5 text-sm">
             {(Object.keys(METODO_LABELS) as MetodoPago[]).map(m => (
               <div key={m} className="flex justify-between"><dt className="text-[#8b949e]">{METODO_LABELS[m]}</dt><dd className="font-mono text-[#e6edf3]">{formatCOP(reporte?.recaudoPorMetodo[m] ?? 0)}</dd></div>
